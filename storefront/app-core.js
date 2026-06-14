@@ -3624,11 +3624,12 @@ function renderCart() {
             item.image,
             item.images?.[0],
           );
+          const productHref = `#product/${encodeURIComponent(String(item.id))}`;
           return `
             <article class="cart-item ${isUpdating ? "is-updating" : ""}">
-              <div class="cart-item-media">${renderProductImage(item, "thumbnail-sprite", activeMedia)}</div>
+              <a class="cart-item-media cart-item-link" href="${productHref}" data-cart-product-link>${renderProductImage(item, "thumbnail-sprite", activeMedia)}</a>
               <div class="cart-item-copy">
-                <h3>${escapeHtml(item.title)}</h3>
+                <h3><a class="cart-item-title-link" href="${productHref}" data-cart-product-link>${escapeHtml(item.title)}</a></h3>
                 <p>${escapeHtml(item.brand)}</p>
                 ${variant ? `<span class="product-meta">${escapeHtml(variantLabel(variant, variant.__index || 0))}</span>` : ""}
                 <div class="cart-item-prices">

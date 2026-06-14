@@ -1798,6 +1798,17 @@ img.large-sprite {
   overflow: hidden;
 }
 
+.cart-item-link,
+.cart-item-title-link {
+  color: inherit;
+  text-decoration: none;
+}
+
+.cart-item-link:hover,
+.cart-item-title-link:hover {
+  text-decoration: underline;
+}
+
 .cart-item h3 {
   margin: 0 0 3px;
   font-size: 12px;

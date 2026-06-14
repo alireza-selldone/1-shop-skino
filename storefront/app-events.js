@@ -1,4 +1,4 @@
-import * as storefront from "./app-core.js?v=storefront-cart-20260614c";
+import * as storefront from "./app-core.js?v=storefront-cart-20260614d";
 
 const {
   state,
@@ -209,6 +209,11 @@ export function registerStorefrontInteractions() {
     const accordion = event.target.closest("[data-accordion-toggle]");
     if (accordion) {
       accordion.closest(".accordion-item")?.classList.toggle("is-open");
+      return;
+    }
+
+    if (event.target.closest("[data-cart-product-link]")) {
+      closeCart();
       return;
     }
 
