@@ -63,11 +63,9 @@ export async function handleStorefrontApi(req, res, url, storefrontSession = nul
   }
 
   if (url.pathname === "/api/storefront/orders" && req.method === "POST") {
-    sendJson(res, 501, {
-      ok: false,
-      source: "storefront_checkout",
-      error: "Selldone checkout is not connected yet. Basket operations are handled by Selldone XAPI; checkout needs a real Selldone gateway endpoint.",
-    });
+    const payload = await readJsonBody(req).catch(() => ({}));
+    const result = await checkoutStorefrontPhysicalBasket(storefrontSession, payload, req);
+    sendJson(res, result.ok ? 200 : result.status || 502, result);
     return true;
   }
 
@@ -258,6 +256,145 @@ async function fetchStorefrontBasketBill(token, type) {
   return requestStorefrontBasketEndpoint(token, endpoint, type, "bill");
 }
 
+async function checkoutStorefrontPhysicalBasket(session, payload = {}, req = null) {
+  const token = await ensureStorefrontToken(session);
+  if (!token) {
+    return { ok: false, source: "storefront_checkout", status: 401, error: "Authentication required" };
+  }
+
+  const shopInfo = await fetchStorefrontShopInfoWithBaskets(token);
+  if (!shopInfo.ok) {
+    return {
+      ok: false,
+      source: "storefront_checkout",
+      status: shopInfo.status || 502,
+      error: shopInfo.error || "Unable to load Selldone checkout basket.",
+      endpoint: shopInfo.endpoint,
+      details: shopInfo.payload,
+    };
+  }
+
+  const basket = extractPhysicalBasketFromShopInfo(shopInfo.payload);
+  const items = firstArray(basket?.items, basket?.basket_items, basket?.lines);
+  if (!basket?.id || !items.length) {
+    return {
+      ok: false,
+      source: "storefront_checkout",
+      status: 409,
+      error: "Your physical Selldone basket is empty.",
+      details: { basket },
+    };
+  }
+
+  const checkout = normalizeStorefrontCheckoutPayload(payload);
+  if (!checkout.receiver_info.name || !checkout.receiver_info.phone || !checkout.receiver_info.address) {
+    return {
+      ok: false,
+      source: "storefront_checkout",
+      status: 400,
+      error: "Receiver name, phone, and address are required.",
+    };
+  }
+
+  const configEndpoint = new URL(`${STOREFRONT_XAPI_BASE}/shops/@${STOREFRONT_SHOP_HANDLE}/baskets/${encodeURIComponent(String(basket.id))}/config`);
+  const configResult = await requestStorefrontAuthorizedEndpoint(token, configEndpoint, {
+    method: "PUT",
+    label: "checkout-config",
+    body: {
+      receiver_info: checkout.receiver_info,
+      delivery_info: checkout.delivery_info,
+      billing: checkout.billing,
+      form: checkout.form,
+      guest_email: checkout.guest_email,
+    },
+  });
+  if (!configResult.ok) {
+    return {
+      ok: false,
+      source: "storefront_checkout",
+      status: configResult.status || 502,
+      error: configResult.error || "Unable to save Selldone checkout details.",
+      endpoint: configResult.endpoint,
+      details: configResult.payload,
+    };
+  }
+
+  const configBill = extractStorefrontBillPayload(configResult.payload);
+  const billResult = await fetchStorefrontBasketBill(token, STOREFRONT_PHYSICAL_BASKET_TYPE);
+  if (!billResult.ok && !configBill) {
+    return {
+      ok: false,
+      source: "storefront_checkout",
+      status: billResult.status || 502,
+      error: billResult.error || "Unable to calculate Selldone checkout bill.",
+      endpoint: billResult.endpoint,
+      details: billResult.payload,
+    };
+  }
+
+  const bill = extractStorefrontBillPayload(billResult.payload) || configBill || {};
+  if (bill?.can_pay === false) {
+    return {
+      ok: false,
+      source: "storefront_checkout",
+      status: 409,
+      error: readStorefrontApiMessage(bill) || "Selldone says this basket cannot be paid yet.",
+      bill,
+      basket,
+    };
+  }
+
+  const gatewayCode = resolveStorefrontCheckoutGateway(checkout.gateway_code, bill, shopInfo.payload);
+  if (!gatewayCode) {
+    return {
+      ok: false,
+      source: "storefront_checkout",
+      status: 409,
+      error: "No available Selldone payment gateway was found for this physical basket.",
+      bill,
+      basket,
+    };
+  }
+
+  const buyEndpoint = new URL(`${STOREFRONT_XAPI_BASE}/shops/@${STOREFRONT_SHOP_HANDLE}/basket/${encodeURIComponent(STOREFRONT_PHYSICAL_BASKET_TYPE)}/buy/${encodeURIComponent(gatewayCode)}`);
+  const buyResult = await requestStorefrontAuthorizedEndpoint(token, buyEndpoint, {
+    method: "POST",
+    label: "checkout-buy",
+    body: {
+      code: basket.code || checkout.code || null,
+      amount_check: checkout.amount_check ?? checkoutAmountCheck(bill, payload),
+      delivery_price: checkoutDeliveryPrice(bill),
+      currency: checkout.currency || firstNonNull(bill.currency, basket.currency, payload?.totals?.currency, null),
+      return: checkout.return_url || storefrontReturnUrl(req),
+      gift_cards: checkout.gift_cards,
+      selected_variant_id: checkout.selected_variant_id,
+      ...(checkout.params && typeof checkout.params === "object" ? checkout.params : {}),
+    },
+  });
+
+  if (!buyResult.ok) {
+    return {
+      ok: false,
+      source: "storefront_checkout",
+      status: buyResult.status || 502,
+      error: buyResult.error || "Selldone checkout payment request failed.",
+      endpoint: buyResult.endpoint,
+      details: buyResult.payload,
+      bill,
+      basket,
+    };
+  }
+
+  return normalizeStorefrontCheckoutResult({
+    gatewayCode,
+    basket,
+    bill,
+    config: configResult.payload,
+    payment: buyResult.payload,
+    endpoint: buyResult.endpoint,
+  });
+}
+
 async function requestStorefrontBasketEndpoint(token, endpoint, type, label) {
   try {
     const response = await fetch(endpoint, {
@@ -297,6 +434,45 @@ async function requestStorefrontBasketEndpoint(token, endpoint, type, label) {
       status: 502,
       error: error.message || `Selldone storefront ${type} ${label} request failed.`,
       endpoint: publicStorefrontEndpoint(endpoint),
+    };
+  }
+}
+
+async function requestStorefrontAuthorizedEndpoint(token, endpoint, { method = "GET", body = null, label = "request" } = {}) {
+  try {
+    const response = await fetch(endpoint, {
+      method,
+      headers: {
+        Accept: "application/json",
+        Authorization: `Bearer ${token}`,
+        "X-Requested-With": "XMLHttpRequest",
+        ...(body !== null ? { "Content-Type": "application/json" } : {}),
+      },
+      ...(body !== null ? { body: JSON.stringify(body) } : {}),
+    });
+    const payload = await readStorefrontResponsePayload(response);
+    const storefrontError = detectStorefrontApiError(payload, response.status);
+    if (!response.ok || storefrontError) {
+      return {
+        ok: false,
+        status: storefrontError?.status || response.status,
+        error: storefrontError?.error || readStorefrontApiMessage(payload) || `${response.statusText || `Selldone storefront ${label} failed.`} (${response.status}).`,
+        payload,
+        endpoint: publicStorefrontEndpoint(endpoint, method),
+      };
+    }
+    return {
+      ok: true,
+      status: response.status,
+      payload,
+      endpoint: publicStorefrontEndpoint(endpoint, method),
+    };
+  } catch (error) {
+    return {
+      ok: false,
+      status: 502,
+      error: error.message || `Selldone storefront ${label} failed.`,
+      endpoint: publicStorefrontEndpoint(endpoint, method),
     };
   }
 }
@@ -357,6 +533,170 @@ function extractStorefrontBillPayload(payload = {}) {
     payload?.payload?.bill,
     null,
   );
+}
+
+function normalizeStorefrontCheckoutPayload(payload = {}) {
+  const source = payload && typeof payload === "object" ? payload : {};
+  const customer = source.customer && typeof source.customer === "object" ? source.customer : {};
+  const receiver = source.receiver_info && typeof source.receiver_info === "object" ? source.receiver_info : {};
+  const delivery = source.delivery_info && typeof source.delivery_info === "object" ? source.delivery_info : {};
+  const shipping = source.shipping && typeof source.shipping === "object" ? source.shipping : {};
+  const billingSource = source.billing && typeof source.billing === "object" ? source.billing : {};
+  const name = String(firstNonNull(receiver.name, receiver.fullName, customer.fullName, customer.name, "")).trim();
+  const email = String(firstNonNull(receiver.email, customer.email, source.guest_email, "")).trim();
+  const phone = String(firstNonNull(receiver.phone, customer.phone, "")).trim();
+  const address = String(firstNonNull(receiver.address, customer.address, "")).trim();
+  const city = String(firstNonNull(receiver.city, customer.city, "")).trim();
+  const state = String(firstNonNull(receiver.state, customer.state, "")).trim();
+  const country = String(firstNonNull(receiver.country, customer.country, "US")).trim();
+  const postal = String(firstNonNull(receiver.postal, receiver.postal_code, customer.postal, customer.postalCode, "")).trim();
+  const note = String(firstNonNull(receiver.message, customer.note, source.note, "")).trim();
+
+  const receiverInfo = {
+    ...receiver,
+    name,
+    phone,
+    email,
+    address,
+    city,
+    state,
+    country,
+    postal,
+    postal_code: postal,
+    message: note,
+  };
+
+  const deliveryInfo = {
+    ...delivery,
+    delivery_type: firstNonNull(delivery.delivery_type, delivery.type, shipping.type, shipping.code, shipping.key, "standard"),
+    transportation_id: firstNonNull(delivery.transportation_id, shipping.id, shipping.transportation_id, null),
+    name: firstNonNull(delivery.name, shipping.name, shipping.title, null),
+  };
+
+  const billing = Object.keys(billingSource).length
+    ? billingSource
+    : {
+        name,
+        phone,
+        email,
+        address,
+        city,
+        state,
+        country,
+        postal,
+        postal_code: postal,
+        custom: false,
+        business: false,
+      };
+
+  return {
+    receiver_info: receiverInfo,
+    delivery_info: deliveryInfo,
+    billing,
+    form: source.form && typeof source.form === "object" ? source.form : note ? { note } : {},
+    guest_email: email || null,
+    gateway_code: String(firstNonNull(source.gateway_code, source.gatewayCode, source.payment?.gateway_code, source.payment?.gatewayCode, source.payment_method, source.paymentMethod, "")).trim(),
+    currency: String(firstNonNull(source.currency, source.totals?.currency, "")).trim(),
+    return_url: String(firstNonNull(source.return_url, source.returnUrl, source.return, "")).trim(),
+    amount_check: Number.isFinite(Number(source.amount_check)) ? Number(source.amount_check) : null,
+    gift_cards: Array.isArray(source.gift_cards) ? source.gift_cards : [],
+    selected_variant_id: Number.isFinite(Number(source.selected_variant_id)) ? Number(source.selected_variant_id) : null,
+    params: source.params && typeof source.params === "object" ? source.params : null,
+    code: String(firstNonNull(source.code, "")).trim() || null,
+  };
+}
+
+function resolveStorefrontCheckoutGateway(requestedGateway, bill = {}, shopPayload = {}) {
+  const requested = String(requestedGateway || "").trim();
+  if (requested && requested !== "auto") return requested;
+  if (bill?.can_cod === true) return "cod";
+  const currency = String(firstNonNull(bill.currency, bill.currency_code, "")).trim();
+  const gateways = extractStorefrontGateways(shopPayload);
+  const eligible = gateways.filter((gateway) => {
+    if (!gateway || typeof gateway !== "object") return false;
+    if (gateway.enable === false || gateway.enabled === false || gateway.active === false) return false;
+    const gatewayCurrency = String(firstNonNull(gateway.currency, gateway.currency_code, "")).trim();
+    if (currency && gatewayCurrency && gatewayCurrency !== currency) return false;
+    return !gateway.cod;
+  });
+  return firstNonNull(...eligible.map(gatewayCodeFromPayload), null);
+}
+
+function gatewayCodeFromPayload(gateway = {}) {
+  const code = firstNonNull(gateway.code, gateway.gateway_code, gateway.gatewayCode, gateway.name, gateway.type, gateway.id, null);
+  return code === null || code === undefined ? null : String(code).trim();
+}
+
+function extractStorefrontGateways(payload = {}) {
+  return firstArray(
+    payload?.gateways,
+    payload?.shop?.gateways,
+    payload?.data?.shop?.gateways,
+    payload?.result?.shop?.gateways,
+    payload?.payload?.shop?.gateways,
+  );
+}
+
+function checkoutAmountCheck(bill = {}, payload = {}) {
+  const amount = firstNonNull(
+    bill.sum,
+    bill.total,
+    bill.final_total,
+    bill.payable,
+    bill.amount,
+    bill.pay_amount,
+    bill.payment_amount,
+    bill.to_pay,
+    payload?.totals?.total,
+    0,
+  );
+  const parsed = Number(amount);
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function checkoutDeliveryPrice(bill = {}) {
+  const price = firstNonNull(bill.delivery_price, bill.shipping, bill.shipping_cost, bill.delivery_cost, bill.transportation_price, 0);
+  const parsed = Number(price);
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function storefrontReturnUrl(req = null) {
+  const host = req?.headers?.host || "localhost:5173";
+  const proto = req?.headers?.["x-forwarded-proto"] || "http";
+  return `${proto}://${host}/#checkout`;
+}
+
+function normalizeStorefrontCheckoutResult({ gatewayCode, basket, bill, config, payment, endpoint }) {
+  const payload = payment && typeof payment === "object" ? payment : {};
+  const targetId = firstNonNull(payload.target_id, payload.targetId, payload.order_id, payload.orderId, payload.basket_id, payload.basketId, payload.id, null);
+  const completed = Boolean(payload.payed_by_gift_card || payload.free_order || payload.cod || payload.dir || targetId);
+  const link = firstNonNull(payload.link, payload.url, payload.redirect, payload.redirect_url, payload.order_url, null);
+  const method = String(firstNonNull(payload.method, link ? "GET" : "", "")).trim().toUpperCase();
+  return {
+    ok: true,
+    source: "storefront_checkout",
+    status: 200,
+    gatewayCode,
+    completed,
+    orderId: targetId,
+    basket,
+    bill,
+    config,
+    payment: payload,
+    endpoint,
+    redirect: link
+      ? {
+          url: link,
+          method: method || "GET",
+          fields: payload.fields || payload.params || payload.pack || {},
+        }
+      : null,
+    pending: payload.que || payload.interval_check ? {
+      que: payload.que || null,
+      interval_check: payload.interval_check || null,
+      transaction_id: firstNonNull(payload.transaction_id, payload.transactionId, payload.que?.id, null),
+    } : null,
+  };
 }
 
 function combineStorefrontBasketResponses(results = []) {

@@ -1,4 +1,4 @@
-import { selldoneImagePathToUrl } from "/dashboard/features/selldone-images.js";
+import { selldoneImagePathToUrl } from "/dashboard/features/selldone-images.js?v=storefront-cart-image-20260614b";
 
 const SPRITE_COLUMNS = 4;
 const SPRITE_ROWS = 4;
@@ -116,6 +116,8 @@ const state = {
   cartLoading: false,
   cartLoadError: "",
   cartUpdatingKeys: new Set(),
+  storefrontShopInfo: null,
+  checkoutGatewayCode: "",
   xapiEndpoint: null,
   activeProductGallery: [],
   activeHeroSlide: 0,
@@ -352,7 +354,7 @@ function normalizeImageCandidate(candidate, options = {}) {
   if (typeof candidate === "string") {
     const trimmed = candidate.trim();
     if (!trimmed) return null;
-    return pickImagePath(trimmed, { scope: "products", shopId }) || trimmed;
+    return pickImagePath(trimmed, { scope: "products", shopId }) || null;
   }
   if (typeof candidate === "object") {
     return normalizeImageCandidate(
@@ -779,7 +781,7 @@ function renderVariantSection(item) {
 
 function renderProductImage(item, className = "product-sprite", media = null) {
   const target = media == null ? item?.image : media;
-  const source = normalizeImageCandidate(target, { shopId: item?.shopId }) || (media == null ? item?.image : media);
+  const source = normalizeImageCandidate(target, { shopId: firstNonNull(item?.shopId, item?.shop_id) });
   if (typeof source === "number") return renderSprite(source, className);
   if (typeof source === "string" && source.trim()) {
     return `<img class="${className}" src="${escapeHtml(source)}" alt="${escapeHtml(item?.title || "Product image")}" loading="lazy" />`;
@@ -2221,6 +2223,125 @@ function checkoutLineItem(entry) {
   `;
 }
 
+function checkoutBillMessages(bill = {}) {
+  const messages = firstArrayValue(bill?.user_messages, bill?.messages, bill?.warnings, bill?.errors);
+  return messages
+    .map((message) => {
+      if (typeof message === "string") return message.trim();
+      if (message && typeof message === "object") return String(firstNonNull(message.message, message.text, message.title, "")).trim();
+      return "";
+    })
+    .filter(Boolean);
+}
+
+function checkoutGateways(currency = "") {
+  const gateways = firstArrayValue(
+    state.storefrontShopInfo?.gateways,
+    state.storefrontShopInfo?.shop?.gateways,
+  );
+  const desiredCurrency = String(currency || "").trim();
+  return gateways
+    .filter((gateway) => gateway && typeof gateway === "object")
+    .filter((gateway) => gateway.enable !== false && gateway.enabled !== false && gateway.active !== false)
+    .filter((gateway) => {
+      const gatewayCurrency = String(firstNonNull(gateway.currency, gateway.currency_code, "") || "").trim();
+      return !desiredCurrency || !gatewayCurrency || gatewayCurrency === desiredCurrency;
+    })
+    .map((gateway) => {
+      const code = String(firstNonNull(gateway.code, gateway.gateway_code, gateway.gatewayCode, gateway.name, gateway.type, gateway.id, "") || "").trim();
+      if (!code) return null;
+      return {
+        code,
+        title: String(firstNonNull(gateway.title, gateway.name, gateway.label, code) || code),
+        cod: gateway.cod === true || code.toLowerCase() === "cod",
+      };
+    })
+    .filter(Boolean);
+}
+
+function checkoutDefaultGatewayCode(bill = {}, currency = "") {
+  const current = String(state.checkoutGatewayCode || "").trim();
+  const gateways = checkoutGateways(currency);
+  const gatewayCodes = gateways.map((gateway) => gateway.code);
+  if (current && (current === "cod" || gatewayCodes.includes(current))) return current;
+  if (bill?.can_cod === true) return "cod";
+  return gateways.find((gateway) => !gateway.cod)?.code || gatewayCodes[0] || "auto";
+}
+
+function renderCheckoutPaymentOptions(bill = {}, currency = "") {
+  const selected = checkoutDefaultGatewayCode(bill, currency);
+  state.checkoutGatewayCode = selected;
+  const gateways = checkoutGateways(currency).filter((gateway) => !gateway.cod);
+  const options = [
+    bill?.can_cod === true
+      ? {
+          code: "cod",
+          title: "Cash on delivery",
+          body: "Pay when the physical order is delivered.",
+        }
+      : null,
+    ...gateways.map((gateway) => ({
+      code: gateway.code,
+      title: gateway.title,
+      body: "Pay securely through Selldone.",
+    })),
+  ].filter(Boolean);
+
+  if (!options.length) {
+    return `<p class="checkout-status checkout-status--error">No Selldone payment gateway is available for this basket.</p>`;
+  }
+
+  return `
+    <div class="checkout-payment-options" role="radiogroup" aria-label="Payment method">
+      ${options
+        .map(
+          (option) => `
+            <label class="checkout-payment-option ${selected === option.code ? "is-active" : ""}">
+              <input type="radio" name="gatewayCode" value="${escapeHtml(option.code)}" ${selected === option.code ? "checked" : ""} />
+              <span>
+                <strong>${escapeHtml(option.title)}</strong>
+                <small>${escapeHtml(option.body)}</small>
+              </span>
+            </label>
+          `,
+        )
+        .join("")}
+    </div>
+  `;
+}
+
+function checkoutSubmitLabel(bill = {}) {
+  if (!state.sessionAuthenticated) return "Log in to place order";
+  if (state.checkoutSubmitting) return "Processing checkout...";
+  if (bill?.can_cod === true && state.checkoutGatewayCode === "cod") return "Place COD order";
+  return "Continue to payment";
+}
+
+function submitRedirectForm(url, method = "GET", fields = {}) {
+  const target = String(url || "").trim();
+  if (!target) return false;
+  const normalizedMethod = String(method || "GET").trim().toUpperCase();
+  if (normalizedMethod === "GET") {
+    window.location.assign(target);
+    return true;
+  }
+  const form = document.createElement("form");
+  form.method = normalizedMethod;
+  form.action = target;
+  form.style.display = "none";
+  Object.entries(fields || {}).forEach(([name, value]) => {
+    if (value === null || value === undefined) return;
+    const input = document.createElement("input");
+    input.type = "hidden";
+    input.name = name;
+    input.value = typeof value === "object" ? JSON.stringify(value) : String(value);
+    form.appendChild(input);
+  });
+  document.body.appendChild(form);
+  form.submit();
+  return true;
+}
+
 function productNeedsStorefrontDetail(item) {
   const variants = getItemVariants(item);
   if (!variants.length) return false;
@@ -2298,7 +2419,7 @@ async function renderAccountProfilePage() {
 
 async function renderCheckoutPage() {
   if (state.sessionAuthenticated) {
-    await hydrateStorefrontCart();
+    await hydrateStorefrontCart(true);
   }
   const entries = cartEntries();
   if (!entries.length) {
@@ -2319,10 +2440,12 @@ async function renderCheckoutPage() {
   const shippingLabel = selectedTransport ? transportDescription(selectedTransport) : "Delivery";
   const total = Number.isFinite(cartTotals.total) ? cartTotals.total : subtotal + shippingCost;
   const cartCurrency = cartTotals.currency || currency;
+  const bill = state.cartSummary && typeof state.cartSummary === "object" ? state.cartSummary : {};
+  const canPay = bill?.can_pay !== false;
+  const billMessages = checkoutBillMessages(bill);
   const customer = state.sessionUser || {};
   const customerName = userDisplayName(customer);
-
-  const formAction = state.sessionAuthenticated ? "Place order" : "Log in to place order";
+  const formAction = checkoutSubmitLabel(bill);
 
   els.app.innerHTML = `
     <div class="page-shell">
@@ -2339,6 +2462,11 @@ async function renderCheckoutPage() {
               <section class="delivery-section">
                 <h2 class="product-meta">Pickup and delivery options</h2>
                 ${shippingCards}
+              </section>
+              <section class="delivery-section">
+                <h2 class="product-meta">Payment</h2>
+                ${renderCheckoutPaymentOptions(bill, cartCurrency || currency)}
+                ${billMessages.length ? `<div class="checkout-status ${canPay ? "" : "checkout-status--error"}">${billMessages.map((message) => `<p>${escapeHtml(message)}</p>`).join("")}</div>` : ""}
               </section>
               <form class="checkout-form-fields" data-checkout-form>
                 <label>
@@ -2359,14 +2487,30 @@ async function renderCheckoutPage() {
                   <span>Email</span>
                   <input type="email" name="email" required value="${escapeHtml(customer.email || "")}" placeholder="you@example.com" />
                 </label>
+                <div class="checkout-field-row">
+                  <label>
+                    <span>Country</span>
+                    <input type="text" name="country" required value="${escapeHtml(customer.country || "US")}" placeholder="US" />
+                  </label>
+                  <label>
+                    <span>State</span>
+                    <input type="text" name="state" value="${escapeHtml(customer.state || "")}" placeholder="State" />
+                  </label>
+                </div>
                 <label>
                   <span>Address</span>
                   <textarea name="address" required rows="3" placeholder="Street, building, neighborhood">${escapeHtml(customer.address || "")}</textarea>
                 </label>
-                <label>
-                  <span>City</span>
-                  <input type="text" name="city" required value="${escapeHtml(customer.city || "")}" placeholder="City" />
-                </label>
+                <div class="checkout-field-row">
+                  <label>
+                    <span>City</span>
+                    <input type="text" name="city" required value="${escapeHtml(customer.city || "")}" placeholder="City" />
+                  </label>
+                  <label>
+                    <span>Postal code</span>
+                    <input type="text" name="postal" value="${escapeHtml(customer.postal || customer.postal_code || "")}" placeholder="Postal code" />
+                  </label>
+                </div>
                 <label>
                   <span>Note</span>
                   <textarea name="note" rows="3" placeholder="Delivery note (optional)"></textarea>
@@ -2376,7 +2520,7 @@ async function renderCheckoutPage() {
                   type="submit"
                   data-checkout-submit
                   data-checkout-state="${state.sessionAuthenticated ? "enabled" : "locked"}"
-                  ${state.sessionAuthenticated ? "" : "disabled"}
+                  ${state.sessionAuthenticated && canPay && !state.checkoutSubmitting ? "" : "disabled"}
                 >
                   ${escapeHtml(formAction)}
                 </button>
@@ -2393,6 +2537,8 @@ async function renderCheckoutPage() {
             <div class="checkout-summary-total">
               <div><span>Subtotal</span><strong>${formatPrice(subtotal, cartCurrency || currency)}</strong></div>
               <div><span>Shipping</span><strong>${formatPrice(shippingCost, currency)} (${escapeHtml(shippingLabel)})</strong></div>
+              ${Number.isFinite(pickNumeric(bill, ["items_discount", "discount_code", "coupon", "club", "offer"], NaN)) ? `<div><span>Discounts</span><strong>${formatPrice(pickNumeric(bill, ["items_discount", "discount_code", "coupon", "club", "offer"], 0), cartCurrency || currency)}</strong></div>` : ""}
+              ${Number.isFinite(pickNumeric(bill, ["tax"], NaN)) ? `<div><span>Tax</span><strong>${formatPrice(pickNumeric(bill, ["tax"], 0), cartCurrency || currency)}</strong></div>` : ""}
               <div class="checkout-summary-total-final"><span>Total</span><strong>${formatPrice(total, cartCurrency || currency)}</strong></div>
             </div>
           </aside>
@@ -2435,17 +2581,58 @@ async function handleCheckoutSubmit(event) {
   const currency = cartTotals.currency || formatOrderCurrency(entries);
   const total = Number.isFinite(cartTotals.total) ? cartTotals.total : subtotal + shippingCost;
   const formData = Object.fromEntries(new FormData(form));
+  const gatewayCode = String(formData.gatewayCode || state.checkoutGatewayCode || "auto").trim();
 
   const payload = {
-    sessionAuthenticated: state.sessionAuthenticated,
+    gateway_code: gatewayCode,
+    currency,
+    return_url: `${window.location.origin}${window.location.pathname}${window.location.search || ""}#checkout`,
     customer: {
       fullName: String(formData.fullName || "").trim(),
       phone: String(formData.phone || "").trim(),
       email: String(formData.email || "").trim(),
+      country: String(formData.country || "").trim(),
+      state: String(formData.state || "").trim(),
       address: String(formData.address || "").trim(),
       city: String(formData.city || "").trim(),
+      postal: String(formData.postal || "").trim(),
       note: String(formData.note || "").trim(),
     },
+    receiver_info: {
+      name: String(formData.fullName || "").trim(),
+      phone: String(formData.phone || "").trim(),
+      email: String(formData.email || "").trim(),
+      country: String(formData.country || "").trim(),
+      state: String(formData.state || "").trim(),
+      address: String(formData.address || "").trim(),
+      city: String(formData.city || "").trim(),
+      postal: String(formData.postal || "").trim(),
+      postal_code: String(formData.postal || "").trim(),
+      message: String(formData.note || "").trim(),
+    },
+    billing: {
+      name: String(formData.fullName || "").trim(),
+      phone: String(formData.phone || "").trim(),
+      email: String(formData.email || "").trim(),
+      country: String(formData.country || "").trim(),
+      state: String(formData.state || "").trim(),
+      address: String(formData.address || "").trim(),
+      city: String(formData.city || "").trim(),
+      postal: String(formData.postal || "").trim(),
+      postal_code: String(formData.postal || "").trim(),
+      custom: false,
+      business: false,
+    },
+    delivery_info: {
+      delivery_type: firstNonNull(selectedTransport?.type, selectedTransport?.code, selectedShippingKey),
+      transportation_id: firstNonNull(selectedTransport?.id, selectedTransport?.transportation_id, null),
+      name: firstNonNull(selectedTransport?.name, selectedTransport?.title, selectedShippingKey),
+    },
+    form: {
+      note: String(formData.note || "").trim(),
+    },
+    guest_email: String(formData.email || "").trim(),
+    amount_check: Number(total.toFixed(2)),
     totals: {
       subtotal: Number(subtotal.toFixed(2)),
       shipping: Number(shippingCost.toFixed(2)),
@@ -2470,7 +2657,7 @@ async function handleCheckoutSubmit(event) {
   const submitButton = form.querySelector("[data-checkout-submit]");
   state.checkoutSubmitting = true;
   submitButton?.setAttribute("disabled", "disabled");
-  submitButton && (submitButton.textContent = "Placing order...");
+  submitButton && (submitButton.textContent = "Processing checkout...");
 
   try {
     const response = await fetch("/api/storefront/orders", {
@@ -2487,29 +2674,43 @@ async function handleCheckoutSubmit(event) {
       throw new Error(extractStorefrontErrorMessage(result, response?.status || 0));
     }
 
-    const orderId = firstNonNull(result.orderId, result.order_id, result?.order?.id, result?.basket?.id, "");
-    if (!orderId) {
-      throw new Error("Selldone checkout did not return an order id.");
+    if (result.redirect?.url) {
+      showToast("Redirecting to payment...");
+      submitRedirectForm(result.redirect.url, result.redirect.method, result.redirect.fields);
+      return;
     }
-    showToast(`Order ${orderId} placed successfully`);
+
+    if (result.pending) {
+      showToast("Payment is pending. Please complete it in Selldone.");
+      state.checkoutSubmitting = false;
+      renderLiveCatalogEmptyState("Payment pending", "Selldone created a pending payment for this order. Complete the payment to finalize checkout.");
+      return;
+    }
+
+    const orderId = firstNonNull(result.orderId, result.order_id, result?.payment?.target_id, result?.payment?.basket_id, result?.basket?.id, "");
+    if (!result.completed && !orderId) {
+      state.checkoutSubmitting = false;
+      throw new Error("Selldone returned an interactive payment step that this storefront cannot render yet. Choose COD if available, or enable a redirect-based gateway.");
+    }
+
+    showToast(orderId ? `Order ${orderId} placed successfully` : "Checkout completed");
     state.cart = {};
     state.cartSummary = null;
+    state.cartLoaded = false;
     saveCart();
     renderCart();
     state.checkoutSubmitting = false;
     state.activeCheckoutShippingKey = "";
-    renderLiveCatalogEmptyState("Order placed", `Your order ${orderId} has been received. Thank you for shopping with Pajulina.`);
+    renderLiveCatalogEmptyState("Order placed", orderId ? `Your order ${orderId} has been received. Thank you for shopping with Pajulina.` : "Your order has been received. Thank you for shopping with Pajulina.");
     setTimeout(() => setHash("shop"), 1000);
   } catch (error) {
     state.checkoutSubmitting = false;
     if (submitButton) {
       submitButton.removeAttribute("disabled");
-      submitButton.textContent = "Place order";
+      submitButton.textContent = checkoutSubmitLabel(state.cartSummary || {});
     }
     showToast(error?.message || "Checkout service is not available right now. Please try again shortly.");
-    state.cart = state.cart || {};
-    state.cartSummary = null;
-    saveCart();
+    await hydrateStorefrontCart(true);
   }
 }
 
@@ -3012,6 +3213,29 @@ function syncCartFromBasketPayload(payload = {}) {
     if (!Number.isFinite(qty) || qty <= 0) return;
 
     const item = getProductById(String(productId));
+    if (item) {
+      const basketImage = normalizeImageCandidate(
+        firstNonNull(
+          line?.image,
+          line?.icon,
+          line?.path,
+          line?.url,
+          line?.photo,
+          line?.product?.image,
+          line?.product?.icon,
+          line?.product?.path,
+          line?.product?.images?.[0],
+          line?.variant?.image,
+          line?.variant?.icon,
+          line?.variant?.path,
+        ),
+        { shopId: firstNonNull(item.shopId, item.shop_id, line?.shop_id, line?.product?.shop_id) },
+      );
+      if (basketImage) {
+        item.image = basketImage;
+        item.images = Array.from(new Set([basketImage, ...(Array.isArray(item.images) ? item.images : [])]));
+      }
+    }
     const variantKey = variantKeyFromBasketLine(line, item);
     const key = cartLineKey(String(productId), variantKey);
     if (!key) return;
@@ -3082,6 +3306,7 @@ async function hydrateStorefrontCart(force = false) {
     }
 
     await ensureBasketProductsAvailable(basket || {});
+    state.storefrontShopInfo = result?.shop && typeof result.shop === "object" ? result.shop : state.storefrontShopInfo;
     syncCartFromBasketPayload(basket || { items: [] });
     syncCartSummary(bill);
     saveCart();
@@ -3374,10 +3599,10 @@ function cartTotalsSummary(entries = []) {
   const localSubtotal = entries.reduce((sum, entry) => sum + entry.linePrice * entry.qty, 0);
   const localCurrency = firstNonNull(entries[0]?.item?.currency, "$");
   const summary = state.cartSummary && typeof state.cartSummary === "object" ? state.cartSummary : null;
-  const summarySubtotal = summary ? pickNumeric(summary, ["subtotal", "sub_total", "items_total", "total_items", "itemsCost", "products_price", "items_price", "basket_price"], localSubtotal) : localSubtotal;
-  const summaryTotal = summary ? pickNumeric(summary, ["total", "final_total", "grand_total", "payable", "amount", "pay_amount", "payment_amount", "to_pay"], NaN) : NaN;
+  const summarySubtotal = summary ? pickNumeric(summary, ["items_price", "subtotal", "sub_total", "items_total", "total_items", "itemsCost", "products_price", "basket_price"], localSubtotal) : localSubtotal;
+  const summaryTotal = summary ? pickNumeric(summary, ["sum", "total", "final_total", "grand_total", "payable", "amount", "pay_amount", "payment_amount", "to_pay", "price"], NaN) : NaN;
   const currency = firstNonNull(summary?.currency, summary?.currency_code, localCurrency);
-  const shipping = summary ? pickNumeric(summary, ["shipping", "shipping_cost", "delivery_cost", "delivery", "shipping_price", "transportation_price"], NaN) : NaN;
+  const shipping = summary ? pickNumeric(summary, ["delivery_price", "shipping", "shipping_cost", "delivery_cost", "delivery", "shipping_price", "transportation_price"], NaN) : NaN;
   return {
     subtotal: summarySubtotal,
     total: summaryTotal,

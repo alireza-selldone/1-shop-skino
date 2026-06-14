@@ -71,6 +71,14 @@ export function selldoneImagePathToUrl(value, options = {}) {
   if (!path) return "";
   const slashPath = path.includes("_") ? normalizeImagePath(path.replaceAll("_", "/")) : "";
 
+  if (slashPath && slashPath !== path && isSelldoneUnderscoreShopPath(path)) {
+    const slashUrl = structuredSelldonePathToUrl(slashPath, options, { allowShopFallback: false });
+    if (slashUrl) return slashUrl;
+
+    const slashFallbackUrl = structuredSelldonePathToUrl(slashPath, options, { allowShopFallback: true });
+    if (slashFallbackUrl) return slashFallbackUrl;
+  }
+
   const directUrl = structuredSelldonePathToUrl(path, options, { allowShopFallback: false });
   if (directUrl) return directUrl;
 
@@ -127,6 +135,10 @@ function normalizeImagePath(value) {
     .replace(/\\/g, "/")
     .replace(/^\/+/, "")
     .replace(/\/{2,}/g, "/");
+}
+
+function isSelldoneUnderscoreShopPath(path) {
+  return /^shops_\d+_(products|categories|articles|pages|folders|vendors|logos|baskets|users|gateways)_/i.test(String(path || ""));
 }
 
 function structuredSelldonePathToUrl(path, options = {}, { allowShopFallback = false } = {}) {
