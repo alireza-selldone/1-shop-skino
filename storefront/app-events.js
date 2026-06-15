@@ -1,4 +1,4 @@
-import * as storefront from "./app-core.js?v=storefront-cart-links-20260614";
+import * as storefront from "./app-core.js?v=storefront-account-menu-20260615b";
 
 const {
   state,
@@ -107,6 +107,14 @@ export function registerStorefrontInteractions() {
       void fetchSessionStatus().then(() => {
         navigateToAccount();
       });
+      return;
+    }
+
+    const accountMenuCart = event.target.closest("[data-account-menu-cart]");
+    if (accountMenuCart) {
+      event.preventDefault();
+      closeAccountMenu();
+      openCart();
       return;
     }
 

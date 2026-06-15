@@ -1443,8 +1443,19 @@ function renderAccountMenu() {
       </div>
     </div>
     <div class="account-menu-links">
-      <a class="text-link" href="#account/profile" data-account-menu-profile>Profile</a>
-      <a class="black-button" href="${buildAccountLogoutUrl()}">Log out</a>
+      <button class="account-menu-link" type="button" data-account-menu-cart>
+        <span><b class="account-menu-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M7 8h10l1.2 12H5.8L7 8ZM9 8a3 3 0 0 1 6 0" /></svg></b> Current bag</span>
+        <small>Review active Selldone cart</small>
+      </button>
+      <a class="account-menu-link" href="#account/orders" data-account-menu-orders>
+        <span><b class="account-menu-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="m4 7 8-4 8 4-8 4-8-4Zm0 0v10l8 4 8-4V7M12 11v10" /></svg></b> Order history</span>
+        <small>View your previous purchases</small>
+      </a>
+      <a class="account-menu-link" href="#account/profile" data-account-menu-profile>
+        <span><b class="account-menu-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M20 21a8 8 0 0 0-16 0M12 13a5 5 0 1 0 0-10 5 5 0 0 0 0 10Z" /></svg></b> Profile</span>
+        <small>Account and contact details</small>
+      </a>
+      <a class="account-menu-logout" href="${buildAccountLogoutUrl()}"><b class="account-menu-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M15 17l5-5-5-5M20 12H9M11 21H5a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h6" /></svg></b> Log out</a>
     </div>
   `;
 }
@@ -1574,7 +1585,7 @@ async function route() {
   } else if (routeName === "checkout") {
     await renderCheckoutPage();
   } else if (routeName === "account") {
-    await renderAccountProfilePage();
+    await renderAccountProfilePage(id);
   } else {
     state.activeProductId = null;
     state.activeProductGallery = [];
@@ -2351,7 +2362,7 @@ function productNeedsStorefrontDetail(item) {
   return variants.some((variant) => !resolveStorefrontVariantId(variant));
 }
 
-async function renderAccountProfilePage() {
+async function renderAccountProfilePage(section = "profile") {
   if (!state.sessionAuthenticated) {
     await fetchSessionStatus(true);
   }
@@ -2368,6 +2379,38 @@ async function renderAccountProfilePage() {
             <p class="product-meta">Please log in to view your account.</p>
             <div class="account-profile-actions">
               <button type="button" class="black-button" data-account-menu-login>Log in</button>
+            </div>
+          </div>
+        </section>
+      </div>
+    `;
+    return;
+  }
+
+  const accountSection = String(section || "profile").trim().toLowerCase();
+  if (accountSection === "orders" || accountSection === "history") {
+    await hydrateStorefrontCart();
+    const activeEntries = cartEntries();
+    els.app.innerHTML = `
+      <div class="page-shell">
+        <nav class="breadcrumbs" aria-label="Account path">
+          <a href="#home">Home</a><span>/</span><a href="#account/profile">Account</a><span>/</span><strong>Orders</strong>
+        </nav>
+        <section class="section">
+          <div class="account-profile-panel">
+            <div class="account-profile-head">
+              <div>
+                <h1>Order history</h1>
+                <p class="product-meta">Your storefront order-history scope is active. Completed Selldone orders will appear here when the order-history endpoint is connected.</p>
+              </div>
+            </div>
+            <div class="account-order-history-empty">
+              <strong>No local order list loaded yet</strong>
+              <p>Current physical basket has ${activeEntries.length} ${activeEntries.length === 1 ? "item" : "items"}. Use the bag or checkout to continue shopping.</p>
+              <div class="account-profile-actions">
+                <button type="button" class="black-button" data-account-menu-cart>Open current bag</button>
+                <a class="text-link" href="#shop">Back to shop</a>
+              </div>
             </div>
           </div>
         </section>
