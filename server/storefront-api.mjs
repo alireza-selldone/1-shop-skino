@@ -12,20 +12,41 @@ function firstNonNull(...values) {
   return values.find((value) => value !== null && value !== undefined);
 }
 
+function normalizeStorefrontApiPath(pathname) {
+  const path = String(pathname || "").trim();
+  if (!path || path === "/") return "/";
+  return path.replace(/\/+$/, "");
+}
+
 export async function handleStorefrontApi(req, res, url, storefrontSession = null) {
-  if (url.pathname === "/api/storefront/products" && req.method === "GET") {
+  const pathname = normalizeStorefrontApiPath(url.pathname);
+
+  if (pathname === "/api/storefront/products" && req.method === "GET") {
     const result = await fetchStorefrontProducts(url);
     sendJson(res, result.ok ? 200 : result.status || 502, result);
     return true;
   }
 
-  if (url.pathname === "/api/storefront/basket" && req.method === "GET") {
+  if ((pathname === "/api/storefront/blogs" || pathname === "/api/storefront/blog") && req.method === "GET") {
+    const result = await fetchStorefrontBlogs(url);
+    sendJson(res, result.ok ? 200 : result.status || 502, result);
+    return true;
+  }
+
+  const blogId = storefrontBlogIdFromApiPath(pathname);
+  if (blogId && req.method === "GET") {
+    const result = await fetchStorefrontBlog(blogId, url);
+    sendJson(res, result.ok ? 200 : result.status || 502, result);
+    return true;
+  }
+
+  if (pathname === "/api/storefront/basket" && req.method === "GET") {
     const result = await fetchStorefrontBasket(storefrontSession, url);
     sendJson(res, result.ok ? 200 : result.status || 502, result);
     return true;
   }
 
-  const basketProductId = storefrontBasketProductIdFromApiPath(url.pathname);
+  const basketProductId = storefrontBasketProductIdFromApiPath(pathname);
   if (basketProductId && req.method === "PUT") {
     const payload = await readJsonBody(req).catch(() => ({}));
     const result = await addToStorefrontBasket(storefrontSession, basketProductId, payload);
@@ -62,20 +83,20 @@ export async function handleStorefrontApi(req, res, url, storefrontSession = nul
     return true;
   }
 
-  if (url.pathname === "/api/storefront/orders" && req.method === "POST") {
+  if (pathname === "/api/storefront/orders" && req.method === "POST") {
     const payload = await readJsonBody(req).catch(() => ({}));
     const result = await checkoutStorefrontPhysicalBasket(storefrontSession, payload, req);
     sendJson(res, result.ok ? 200 : result.status || 502, result);
     return true;
   }
 
-  if (url.pathname === "/api/storefront/shop/info" && req.method === "GET") {
+  if (pathname === "/api/storefront/shop/info" && req.method === "GET") {
     const result = await fetchStorefrontShopInfo();
     sendJson(res, result.ok ? 200 : result.status || 502, result);
     return true;
   }
 
-  const productId = storefrontProductIdFromApiPath(url.pathname);
+  const productId = storefrontProductIdFromApiPath(pathname);
   if (productId && req.method === "GET") {
     const result = await fetchStorefrontProduct(productId);
     sendJson(res, result.ok ? 200 : result.status || 502, result);
@@ -852,6 +873,59 @@ async function fetchStorefrontProduct(productId) {
   return requestStorefrontXapi(endpoint, "product");
 }
 
+async function fetchStorefrontBlogs(url) {
+  const endpoint = new URL(`${STOREFRONT_XAPI_BASE}/shops/@${STOREFRONT_SHOP_HANDLE}/blogs`);
+  const limit = clampInteger(url.searchParams.get("limit"), 1, 100, 24);
+  const offset = clampInteger(url.searchParams.get("offset"), 0, 100000, 0);
+
+  endpoint.searchParams.set("offset", offset);
+  endpoint.searchParams.set("limit", limit);
+
+  const category = String(url.searchParams.get("category") || "").trim();
+  const search = String(url.searchParams.get("search") || "").trim();
+  if (category && category !== "all") endpoint.searchParams.set("category", category);
+  if (search) endpoint.searchParams.set("search", search);
+
+  return requestStorefrontXapi(endpoint, "blogs");
+}
+
+async function fetchStorefrontBlog(articleId, url) {
+  const listUrl = new URL(url);
+  listUrl.searchParams.set("limit", "100");
+  listUrl.searchParams.set("offset", "0");
+  const result = await fetchStorefrontBlogs(listUrl);
+  if (!result.ok) return result;
+
+  const rawNeedle = String(articleId || "").trim();
+  const needle = (() => {
+    try {
+      return decodeURIComponent(rawNeedle);
+    } catch {
+      return rawNeedle;
+    }
+  })();
+  const article = firstArray(result.articles, result.blogs, result.data?.articles, result.data?.blogs).find((entry) => {
+    if (!entry || typeof entry !== "object") return false;
+    return String(firstNonNull(entry.id, "")).trim() === needle || String(firstNonNull(entry.slug, "")).trim() === needle;
+  });
+
+  if (!article) {
+    return {
+      ok: false,
+      source: "storefront_xapi",
+      status: 404,
+      endpoint: result.endpoint,
+      error: "Blog article was not found in Selldone storefront blogs.",
+      articles: result.articles || [],
+    };
+  }
+
+  return {
+    ...result,
+    article,
+  };
+}
+
 async function fetchStorefrontShopInfo() {
   const endpoint = new URL(`${STOREFRONT_XAPI_BASE}/shops/@${STOREFRONT_SHOP_HANDLE}/info`);
   return requestStorefrontXapi(endpoint, "shop-info");
@@ -905,6 +979,40 @@ async function requestStorefrontXapi(endpoint, label) {
       ),
       total: firstNonNull(payload?.total, payload?.data?.total, payload?.result?.total, payload?.payload?.total, 0),
       product: firstNonNull(payload?.product, payload?.data?.product, payload?.result?.product, payload?.payload?.product, null),
+      article: firstNonNull(payload?.article, payload?.blog, payload?.data?.article, payload?.data?.blog, payload?.result?.article, payload?.result?.blog, payload?.payload?.article, payload?.payload?.blog, null),
+      articles: firstArray(
+        payload?.articles,
+        payload?.blogs,
+        payload?.data?.articles,
+        payload?.data?.blogs,
+        payload?.result?.articles,
+        payload?.result?.blogs,
+        payload?.payload?.articles,
+        payload?.payload?.blogs,
+        payload?.payload?.data?.articles,
+        payload?.payload?.data?.blogs,
+        payload?.data?.payload?.articles,
+        payload?.data?.payload?.blogs,
+        payload?.items,
+        payload?.data?.items,
+        payload?.result?.items,
+        payload?.payload?.items,
+      ),
+      blogs: firstArray(
+        payload?.blogs,
+        payload?.articles,
+        payload?.data?.blogs,
+        payload?.data?.articles,
+        payload?.result?.blogs,
+        payload?.result?.articles,
+        payload?.payload?.blogs,
+        payload?.payload?.articles,
+        payload?.items,
+      ),
+      last_articles: firstArray(payload?.last_articles, payload?.data?.last_articles, payload?.result?.last_articles, payload?.payload?.last_articles),
+      popular: firstArray(payload?.popular, payload?.data?.popular, payload?.result?.popular, payload?.payload?.popular),
+      categories: firstArray(payload?.categories, payload?.data?.categories, payload?.result?.categories, payload?.payload?.categories),
+      interest: firstArray(payload?.interest, payload?.data?.interest, payload?.result?.interest, payload?.payload?.interest),
       transportations: firstArray(
         payload?.transportations,
         payload?.shop?.transportations,
@@ -949,6 +1057,11 @@ function publicStorefrontEndpoint(endpoint, method = "GET") {
 
 function storefrontProductIdFromApiPath(pathname) {
   const match = pathname.match(/^\/api\/storefront\/products\/([^/]+)$/);
+  return match ? decodeURIComponent(match[1]) : null;
+}
+
+function storefrontBlogIdFromApiPath(pathname) {
+  const match = pathname.match(/^\/api\/storefront\/blogs?\/([^/]+)$/);
   return match ? decodeURIComponent(match[1]) : null;
 }
 

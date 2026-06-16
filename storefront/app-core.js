@@ -9,6 +9,7 @@ const DATA_SOURCE = {
   xapi: "xapi",
 };
 const XAPI_PRODUCT_LIMIT = 200;
+const BLOG_LIMIT = 24;
 
 const heroSlides = [
   {
@@ -119,6 +120,12 @@ const state = {
   storefrontShopInfo: null,
   checkoutGatewayCode: "",
   xapiEndpoint: null,
+  blogs: [],
+  blogCategories: [],
+  blogTotal: 0,
+  blogsLoaded: false,
+  blogsLoading: false,
+  blogsLoadError: "",
   activeProductGallery: [],
   activeHeroSlide: 0,
 };
@@ -1007,6 +1014,317 @@ function responseProducts(payload) {
   return singleProduct ? [singleProduct] : [];
 }
 
+function responseArticles(payload) {
+  return firstArray(
+    payload?.articles,
+    payload?.blogs,
+    payload?.data?.articles,
+    payload?.data?.blogs,
+    payload?.result?.articles,
+    payload?.result?.blogs,
+    payload?.payload?.articles,
+    payload?.payload?.blogs,
+    payload?.payload?.data?.articles,
+    payload?.payload?.data?.blogs,
+    payload?.data?.payload?.articles,
+    payload?.data?.payload?.blogs,
+    payload?.items,
+    payload?.data?.items,
+    payload?.result?.items,
+    payload?.payload?.items,
+  );
+}
+
+function responseBlogCategories(payload) {
+  return firstArray(
+    payload?.categories,
+    payload?.data?.categories,
+    payload?.result?.categories,
+    payload?.payload?.categories,
+    payload?.data?.payload?.categories,
+  );
+}
+
+function normalizeBlogImage(rawArticle, index = 0) {
+  const imageSource = firstNonNull(
+    rawArticle?.image,
+    rawArticle?.cover,
+    rawArticle?.thumbnail,
+    rawArticle?.photo,
+    rawArticle?.icon,
+    rawArticle?.banner,
+    rawArticle?.file,
+    rawArticle?.files?.[0]?.path,
+    rawArticle?.files?.[0]?.url,
+  );
+
+  if (typeof imageSource === "string") {
+    const direct = imageSource.trim();
+    if (!direct) return index % (SPRITE_COLUMNS * SPRITE_ROWS);
+    return pickImagePath(direct, { scope: "blogs", shopId: rawArticle?.shop_id || rawArticle?.shop?.id }) ||
+      pickImagePath(direct, { scope: "articles", shopId: rawArticle?.shop_id || rawArticle?.shop?.id }) ||
+      direct;
+  }
+
+  const normalized = normalizeImageCandidate(imageSource, { shopId: rawArticle?.shop_id || rawArticle?.shop?.id });
+  return normalized ?? index % (SPRITE_COLUMNS * SPRITE_ROWS);
+}
+
+function truthyFlag(value) {
+  return value === true || value === 1 || String(value || "").trim().toLowerCase() === "true";
+}
+
+function falseyFlag(value) {
+  return value === false || value === 0 || String(value || "").trim().toLowerCase() === "false";
+}
+
+function mapBlogArticle(raw, index = 0) {
+  if (!raw || typeof raw !== "object") return null;
+  const id = firstNonNull(raw.id, raw.article_id, raw.articleId, raw.code, raw.slug);
+  const title = String(firstNonNull(raw.title, raw.name, raw.heading, "")).trim();
+  if (!id || !title) return null;
+
+  const parent = raw.parent && typeof raw.parent === "object" ? raw.parent : {};
+  const categorySource = firstNonNull(raw.category, raw.category_name, raw.category_slug, raw.blog_category, parent.category, parent.category_id, "");
+  const author = raw.user && typeof raw.user === "object"
+    ? firstNonNull(raw.user.name, raw.user.username, raw.user.profile?.name, "")
+    : firstNonNull(raw.author, raw.writer, "");
+  const description = String(firstNonNull(raw.description, raw.summary, raw.excerpt, raw.subtitle, "")).trim();
+  const content = String(firstNonNull(raw.body, raw.content, raw.html, raw.article, raw.text, "")).trim();
+
+  return {
+    ...raw,
+    id: String(id),
+    slug: String(firstNonNull(raw.slug, toSlug(title), id)).trim(),
+    title,
+    description,
+    content,
+    image: normalizeBlogImage(raw, index),
+    category: categorySource ? String(categorySource).trim() : "Beauty Notes",
+    author: String(author || "Pajulina").trim(),
+    createdAt: firstNonNull(raw.created_at, raw.createdAt, raw.published_at, raw.publishedAt, raw.date, ""),
+    updatedAt: firstNonNull(raw.updated_at, raw.updatedAt, ""),
+    published: !falseyFlag(raw.published),
+    private: truthyFlag(raw.private),
+  };
+}
+
+function applyStorefrontBlogs(payload) {
+  const rawArticles = responseArticles(payload);
+  state.blogs = rawArticles.map(mapBlogArticle).filter((article) => article && article.published && !article.private);
+  state.blogCategories = responseBlogCategories(payload);
+  state.blogTotal = toInteger(firstNonNull(payload?.total, payload?.data?.total, state.blogs.length), state.blogs.length) || state.blogs.length;
+  state.blogsLoadError = "";
+  state.blogsLoaded = true;
+  return true;
+}
+
+async function fetchStorefrontBlogsViaProxy() {
+  const response = await fetch(`/api/storefront/blogs?limit=${BLOG_LIMIT}`, {
+    headers: { Accept: "application/json" },
+  });
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok || payload.ok === false) {
+    throw new Error(payload.error || `Local Selldone blog proxy failed with status ${response.status}.`);
+  }
+  return payload;
+}
+
+async function fetchStorefrontBlogArticleViaProxy(articleId) {
+  const target = String(articleId || "").trim();
+  if (!target) return null;
+  const response = await fetch(`/api/storefront/blogs/${encodeURIComponent(target)}`, {
+    headers: { Accept: "application/json" },
+  });
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok || payload.ok === false) {
+    throw new Error(payload.error || `Local Selldone blog article proxy failed with status ${response.status}.`);
+  }
+  return payload;
+}
+
+function upsertBlogArticle(rawArticle) {
+  const mapped = mapBlogArticle(rawArticle, state.blogs.length);
+  if (!mapped) return null;
+  const nextBlogs = [...state.blogs];
+  const index = nextBlogs.findIndex((entry) => String(entry.id) === String(mapped.id) || String(entry.slug) === String(mapped.slug));
+  if (index >= 0) {
+    nextBlogs[index] = {
+      ...nextBlogs[index],
+      ...mapped,
+      content: mapped.content || nextBlogs[index].content || "",
+    };
+  } else {
+    nextBlogs.unshift(mapped);
+  }
+  state.blogs = nextBlogs;
+  return index >= 0 ? state.blogs[index] : mapped;
+}
+
+async function ensureBlogArticleLoaded(articleId) {
+  const existing = findBlogArticle(articleId);
+  if (existing?.content) return existing;
+
+  try {
+    const payload = await fetchStorefrontBlogArticleViaProxy(articleId);
+    const article = firstNonNull(
+      payload?.article,
+      payload?.blog,
+      payload?.data?.article,
+      payload?.data?.blog,
+      responseArticles(payload).find((entry) => {
+        const needle = String(articleId || "").trim();
+        return String(entry?.id || "") === needle || String(entry?.slug || "") === needle;
+      }),
+      null,
+    );
+    return upsertBlogArticle(article) || existing;
+  } catch (error) {
+    console.warn("Selldone blog article detail fetch failed:", error);
+    return existing;
+  }
+}
+
+async function ensureBlogsLoaded(force = false) {
+  if (!force && state.blogsLoaded) return;
+  if (state.blogsLoading) return;
+  state.blogsLoading = true;
+  state.blogsLoadError = "";
+  try {
+    const payload = await fetchStorefrontBlogsViaProxy();
+    applyStorefrontBlogs(payload);
+  } catch (error) {
+    state.blogs = [];
+    state.blogCategories = [];
+    state.blogTotal = 0;
+    state.blogsLoaded = true;
+    state.blogsLoadError = `Could not load Selldone blog posts. ${error.message || ""}`.trim();
+    console.error("Selldone blog load failed:", error);
+  } finally {
+    state.blogsLoading = false;
+  }
+}
+
+function blogArticleUrl(article) {
+  return `#blog/${encodeURIComponent(String(article?.slug || article?.id || ""))}`;
+}
+
+function blogArticleDate(article) {
+  const value = firstNonNull(article?.createdAt, article?.created_at, article?.published_at, "");
+  if (!value) return "";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return String(value).slice(0, 10);
+  return date.toLocaleDateString("en", { year: "numeric", month: "short", day: "numeric" });
+}
+
+function renderBlogImage(article, className = "blog-card-media") {
+  if (typeof article?.image === "number") {
+    return `<div class="${className}">${renderSprite(article.image, "blog-sprite")}</div>`;
+  }
+  if (typeof article?.image === "string" && article.image.trim()) {
+    return `<div class="${className}"><img src="${escapeHtml(article.image)}" alt="${escapeHtml(article.title || "Blog image")}" loading="lazy" /></div>`;
+  }
+  return `<div class="${className} blog-card-media--fallback"><span>Pajulina Notes</span></div>`;
+}
+
+function renderBlogCard(article, options = {}) {
+  const compact = Boolean(options.compact);
+  return `
+    <article class="blog-card ${compact ? "blog-card--compact" : ""}">
+      <a href="${blogArticleUrl(article)}" aria-label="${escapeHtml(article.title)}">
+        ${renderBlogImage(article)}
+      </a>
+      <div class="blog-card-copy">
+        <div class="blog-meta">
+          <span>${escapeHtml(article.category || "Beauty Notes")}</span>
+          ${blogArticleDate(article) ? `<span>${escapeHtml(blogArticleDate(article))}</span>` : ""}
+        </div>
+        <h2><a href="${blogArticleUrl(article)}">${escapeHtml(article.title)}</a></h2>
+        <p>${escapeHtml(article.description || "Read the latest Pajulina storefront update.")}</p>
+        <a class="text-link" href="${blogArticleUrl(article)}">Read article</a>
+      </div>
+    </article>
+  `;
+}
+
+function blogCategoryLabel(rawCategory) {
+  if (!rawCategory || typeof rawCategory !== "object") return String(rawCategory || "").trim();
+  return String(firstNonNull(rawCategory.title, rawCategory.name, rawCategory.label, rawCategory.slug, rawCategory.id, "")).trim();
+}
+
+function renderBlogCategoryChips(activeCategory = "all") {
+  const labels = Array.from(new Set(state.blogCategories.map(blogCategoryLabel).filter(Boolean)));
+  if (!labels.length) return "";
+  return `
+    <div class="filter-bar blog-filter-bar" role="group" aria-label="Filter blog posts">
+      <a class="filter-chip ${activeCategory === "all" ? "is-active" : ""}" href="#blog">All</a>
+      ${labels
+        .map((label) => {
+          const key = toSlug(label) || label;
+          return `<a class="filter-chip ${activeCategory === key ? "is-active" : ""}" href="#blog?category=${encodeURIComponent(key)}">${escapeHtml(label)}</a>`;
+        })
+        .join("")}
+    </div>
+  `;
+}
+
+function sanitizeArticleHtml(rawHtml) {
+  const value = String(rawHtml || "").trim();
+  if (!value) return "";
+  const parser = new DOMParser();
+  const doc = parser.parseFromString(`<article>${value}</article>`, "text/html");
+  doc.querySelectorAll("script, style, iframe, object, embed, form, input, button").forEach((node) => node.remove());
+  doc.querySelectorAll("*").forEach((node) => {
+    [...node.attributes].forEach((attribute) => {
+      const name = attribute.name.toLowerCase();
+      const content = String(attribute.value || "").trim().toLowerCase();
+      if (name.startsWith("on") || content.startsWith("javascript:") || name === "style") {
+        node.removeAttribute(attribute.name);
+      }
+    });
+  });
+  return doc.body.firstElementChild?.innerHTML || "";
+}
+
+function renderBlogBody(article) {
+  const content = sanitizeArticleHtml(article?.content || article?.body || article?.html || "");
+  if (content) return content;
+  const description = article?.description || "This article is available in the Selldone blog feed.";
+  return `<p>${escapeHtml(description)}</p>`;
+}
+
+function findBlogArticle(articleId) {
+  const rawNeedle = String(articleId || "").trim();
+  const needle = (() => {
+    try {
+      return decodeURIComponent(rawNeedle);
+    } catch {
+      return rawNeedle;
+    }
+  })();
+  if (!needle) return null;
+  return state.blogs.find((article) => String(article.id) === needle || String(article.slug) === needle) || null;
+}
+
+function renderBlogTeaserSection() {
+  const items = state.blogs.slice(0, 3);
+  if (!items.length) return "";
+  return `
+    <section class="section blog-preview-section">
+      <div class="section-head">
+        <div>
+          <h2>Latest beauty notes</h2>
+          <p>Fresh updates, routines, and selling ideas from Pajulina.</p>
+        </div>
+        <a class="text-link" href="#blog">View all posts</a>
+      </div>
+      <div class="blog-preview-grid">
+        ${items.map((article) => renderBlogCard(article, { compact: true })).join("")}
+      </div>
+    </section>
+  `;
+}
+
 function responseFolders(payload) {
   return firstArray(
     payload?.folders,
@@ -1729,11 +2047,14 @@ async function route() {
     await renderProductPage(productId);
   } else if (routeName === "checkout") {
     await renderCheckoutPage();
+  } else if (routeName === "blog" || routeName === "blogs") {
+    await renderBlogPage(id, query);
   } else if (routeName === "account") {
     await renderAccountProfilePage(id);
   } else {
     state.activeProductId = null;
     state.activeProductGallery = [];
+    await ensureBlogsLoaded();
     renderHomePage();
   }
 
@@ -1743,7 +2064,10 @@ async function route() {
 
 function updateNav(routeName) {
   document.querySelectorAll("[data-nav-link]").forEach((link) => {
-    link.classList.toggle("is-active", routeName === "shop" && link.dataset.navLink !== "events");
+    const key = link.dataset.navLink;
+    const isBlog = (routeName === "blog" || routeName === "blogs") && key === "blog";
+    const isShop = routeName === "shop" && key !== "events" && key !== "blog";
+    link.classList.toggle("is-active", isShop || isBlog);
   });
 }
 
@@ -1976,6 +2300,7 @@ function renderHomePage() {
       </section>
 
       ${renderProductSection("We think you'll like", `${recommended.length} items`, recommended, "product-row")}
+      ${renderBlogTeaserSection()}
 
       <section class="section">
         <div class="gift-banner">
@@ -2099,6 +2424,104 @@ function renderShopPage() {
           <button class="black-button" type="button">Load more</button>
         </div>
       </section>
+    </div>
+  `;
+}
+
+async function renderBlogPage(articleId = "", query = new URLSearchParams()) {
+  await ensureBlogsLoaded();
+
+  if (articleId) {
+    await renderBlogArticlePage(articleId);
+    return;
+  }
+
+  const activeCategory = toSlug(query.get("category") || "all") || "all";
+  const filtered = activeCategory === "all"
+    ? state.blogs
+    : state.blogs.filter((article) => toSlug(article.category) === activeCategory);
+  const featured = filtered[0] || null;
+  const rest = featured ? filtered.slice(1) : filtered;
+
+  if (state.blogsLoadError) {
+    renderLiveCatalogEmptyState("Selldone blog is unavailable", state.blogsLoadError);
+    return;
+  }
+
+  els.app.innerHTML = `
+    <div class="page-shell">
+      <nav class="breadcrumbs" aria-label="Blog path">
+        <a href="#home">Home</a><span>/</span><strong>Blog</strong>
+      </nav>
+
+      <section class="blog-hero">
+        <div>
+          <span class="eyebrow">Pajulina journal</span>
+          <h1>Beauty routines, storefront updates, and selling ideas.</h1>
+          <p>${state.blogTotal || filtered.length} posts synced from Selldone blog content.</p>
+        </div>
+        ${featured ? renderBlogCard(featured, { compact: true }) : `<div class="blog-empty-card">No blog posts are published yet.</div>`}
+      </section>
+
+      <section class="section">
+        <div class="section-head">
+          <div>
+            <h2>All posts</h2>
+            <p>${filtered.length} visible articles</p>
+          </div>
+          <a class="text-link" href="#shop">Shop products</a>
+        </div>
+        ${renderBlogCategoryChips(activeCategory)}
+        ${filtered.length ? `<div class="blog-grid">${rest.map((article) => renderBlogCard(article)).join("")}</div>` : `<div class="blog-empty-card">No posts matched this category.</div>`}
+      </section>
+    </div>
+  `;
+}
+
+async function renderBlogArticlePage(articleId) {
+  const article = await ensureBlogArticleLoaded(articleId);
+  if (!article) {
+    renderLiveCatalogEmptyState("Blog article was not found", "This post is not available in the current Selldone blog feed.");
+    return;
+  }
+
+  const related = state.blogs.filter((entry) => entry.id !== article.id).slice(0, 3);
+  els.app.innerHTML = `
+    <div class="page-shell">
+      <nav class="breadcrumbs" aria-label="Blog article path">
+        <a href="#home">Home</a><span>/</span><a href="#blog">Blog</a><span>/</span><strong>${escapeHtml(article.title)}</strong>
+      </nav>
+
+      <article class="blog-article">
+        <header class="blog-article-head">
+          <div class="blog-meta">
+            <span>${escapeHtml(article.category || "Beauty Notes")}</span>
+            ${blogArticleDate(article) ? `<span>${escapeHtml(blogArticleDate(article))}</span>` : ""}
+            <span>${escapeHtml(article.author || "Pajulina")}</span>
+          </div>
+          <h1>${escapeHtml(article.title)}</h1>
+          ${article.description ? `<p>${escapeHtml(article.description)}</p>` : ""}
+        </header>
+        ${renderBlogImage(article, "blog-article-media")}
+        <div class="blog-article-body">
+          ${renderBlogBody(article)}
+        </div>
+      </article>
+
+      ${related.length ? `
+        <section class="section">
+          <div class="section-head">
+            <div>
+              <h2>More from the blog</h2>
+              <p>${related.length} articles</p>
+            </div>
+            <a class="text-link" href="#blog">All posts</a>
+          </div>
+          <div class="blog-preview-grid">
+            ${related.map((entry) => renderBlogCard(entry, { compact: true })).join("")}
+          </div>
+        </section>
+      ` : ""}
     </div>
   `;
 }
