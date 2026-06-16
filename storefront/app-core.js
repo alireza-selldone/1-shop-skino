@@ -3558,11 +3558,14 @@ function accordionItem(title, body, open = false) {
 function miniProduct(item) {
   if (!item) return "";
   const rating = toNumber(item.rating, 0);
+  const href = `#product/${encodeURIComponent(String(item.id || ""))}`;
   return `
     <div class="mini-product">
-      <div class="mini-media">${renderProductImage(item, "thumbnail-sprite")}</div>
+      <a class="mini-media mini-product-link" href="${href}" aria-label="${escapeHtml(item.title)}">
+        ${renderProductImage(item, "thumbnail-sprite")}
+      </a>
       <div>
-        <h4>${escapeHtml(item.title)}</h4>
+        <h4><a class="mini-product-title-link" href="${href}">${escapeHtml(item.title)}</a></h4>
         <p>${escapeHtml(item.brand)}</p>
         <span class="rating"><span class="stars">*****</span>${rating.toFixed(1)}</span>
       </div>
@@ -3573,13 +3576,16 @@ function miniProduct(item) {
 
 function routineStep(label, item) {
   if (!item) return "";
+  const href = `#product/${encodeURIComponent(String(item.id || ""))}`;
   return `
     <div class="routine-step">
-      <div class="mini-media">${renderProductImage(item, "thumbnail-sprite")}</div>
+      <a class="mini-media routine-step-media" href="${href}" aria-label="${escapeHtml(item.title)}">
+        ${renderProductImage(item, "thumbnail-sprite")}
+      </a>
       <div>
-        <span class="product-meta">${label}</span>
-        <h4>${escapeHtml(item.title)}</h4>
-        <p>${formatPrice(item.price, item.currency)}</p>
+        <span class="routine-step-label">${escapeHtml(label)}</span>
+        <h4><a class="routine-step-title-link" href="${href}">${escapeHtml(item.title)}</a></h4>
+        <p>${escapeHtml(item.brand || "Pajulina")} · ${formatPrice(item.price, item.currency)}</p>
       </div>
     </div>
   `;
