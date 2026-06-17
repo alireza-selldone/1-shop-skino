@@ -1,3 +1,3 @@
-import { registerStorefrontInteractions } from "./app-events.js?v=storefront-loading-20260616";
+import { registerStorefrontInteractions } from "./app-events.js?v=storefront-variant-boxes-20260617";
 
 registerStorefrontInteractions();

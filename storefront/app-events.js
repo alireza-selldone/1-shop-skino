@@ -1,4 +1,4 @@
-import * as storefront from "./app-core.js?v=storefront-loading-20260616";
+import * as storefront from "./app-core.js?v=storefront-variant-boxes-20260617";
 
 const {
   state,
@@ -23,6 +23,7 @@ const {
   renderProductImage,
   renderProductPage,
   renderShopPage,
+  selectProductVariantOption,
   route,
   setActiveProductVariantSelection,
   setCartQuantity,
@@ -226,6 +227,21 @@ export function registerStorefrontInteractions() {
       if (!selected) return;
 
       setActiveProductVariantSelection(productId, selected);
+      const selectedGallery = normalizeGallery(item, selected);
+      state.activeMedia = selectedGallery.length ? selectedGallery[0] : item.image ?? 0;
+      renderProductPage(productId);
+      return;
+    }
+
+    const variantGroupedOption = event.target.closest("[data-variant-option-name]");
+    if (variantGroupedOption) {
+      const productId = variantGroupedOption.dataset.variantOptionProduct;
+      const optionName = variantGroupedOption.dataset.variantOptionName;
+      const optionValue = variantGroupedOption.dataset.variantOptionValue;
+      const item = getProductById(productId) || getProductById(state.activeProductId);
+      if (!item || !optionName || !optionValue) return;
+
+      const selected = selectProductVariantOption(productId, optionName, optionValue);
       const selectedGallery = normalizeGallery(item, selected);
       state.activeMedia = selectedGallery.length ? selectedGallery[0] : item.image ?? 0;
       renderProductPage(productId);

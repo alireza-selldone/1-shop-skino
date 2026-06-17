@@ -732,11 +732,16 @@ function normalizeProductVariants(rawVariants = [], rawProduct = null) {
       const variantId = firstNonNull(variant.id, variant.variant_id, variant.sku, variant.code, variant.name, variant.title);
       const key = String(firstNonNull(variantId, `${productId}-${index}`)).trim();
       const color = firstNonNull(variant.color, variant.colour, variant.hex, variant.color_code, variant.colour_code, variant.swatch_color);
+      const optionEntries = extractVariantOptionEntries({ ...variant, __swatchColor: color ? String(color).trim() : "" });
       return {
         ...variant,
         __index: index,
         __key: `${productId}:${key}`,
         __swatchColor: color ? String(color).trim() : "",
+        __options: optionEntries,
+        __optionMap: Object.fromEntries(optionEntries.map((option) => [option.key, option.value])),
+        __optionLabels: Object.fromEntries(optionEntries.map((option) => [option.key, option.label])),
+        __optionDisplays: Object.fromEntries(optionEntries.map((option) => [option.key, option.display])),
       };
     })
     .filter(Boolean);
@@ -746,20 +751,150 @@ function getItemVariants(item) {
   return Array.isArray(item?.variants) ? item.variants : [];
 }
 
+function cleanVariantOptionValue(value) {
+  if (value === null || value === undefined) return "";
+  if (typeof value === "object") {
+    return String(firstNonNull(value.value, value.name, value.title, value.label, value.code, value.hex, value.id, "")).trim();
+  }
+  return String(value).trim();
+}
+
+function variantOptionValueKey(value) {
+  return cleanVariantOptionValue(value).toLowerCase();
+}
+
+function normalizeVariantOptionKey(label) {
+  const text = String(label || "").trim().toLowerCase();
+  const slug = toSlug(text);
+  if (!slug) return "";
+  if (/(colour|color|hex|swatch|رنگ)/i.test(text)) return "color";
+  if (/(size|سایز|اندازه)/i.test(text)) return "size";
+  if (/(volume|capacity|ml|milliliter|حجم)/i.test(text)) return "volume";
+  if (/(weight|gram|gr|g$|وزن)/i.test(text)) return "weight";
+  if (/(material|جنس)/i.test(text)) return "material";
+  if (/(scent|fragrance|perfume|بو|رایحه)/i.test(text)) return "scent";
+  if (/(flavo[u]?r|taste|طعم)/i.test(text)) return "flavor";
+  if (/(pack|package|bundle|پک|بسته)/i.test(text)) return "pack";
+  if (/(style|model|مدل)/i.test(text)) return "style";
+  return slug;
+}
+
+function variantOptionLabel(key) {
+  const labels = {
+    color: "Color",
+    size: "Size",
+    volume: "Volume",
+    weight: "Weight",
+    material: "Material",
+    scent: "Scent",
+    flavor: "Flavor",
+    pack: "Pack",
+    style: "Style",
+  };
+  return labels[key] || titleCase(key);
+}
+
+function extractVariantOptionEntries(variant = {}) {
+  const entries = [];
+  const seen = new Set();
+  const pushOption = (rawKey, rawLabel, rawValue, rawSwatch = "") => {
+    const key = normalizeVariantOptionKey(rawKey || rawLabel);
+    const display = cleanVariantOptionValue(rawValue);
+    if (!key || !display) return;
+    const signature = `${key}:${variantOptionValueKey(display)}`;
+    if (seen.has(signature)) return;
+    seen.add(signature);
+    entries.push({
+      key,
+      label: rawLabel || variantOptionLabel(key),
+      value: variantOptionValueKey(display),
+      display,
+      swatch: cleanVariantOptionValue(rawSwatch),
+    });
+  };
+
+  pushOption("color", "Color", firstNonNull(variant.color, variant.colour, variant.color_name, variant.colour_name, variant.hex, variant.color_code, variant.colour_code, variant.swatch_color), firstNonNull(variant.__swatchColor, variant.hex, variant.color_code, variant.colour_code, variant.swatch_color));
+  pushOption("size", "Size", firstNonNull(variant.size, variant.size_name, variant.option_size));
+  pushOption("volume", "Volume", firstNonNull(variant.volume, variant.volume_name, variant.capacity, variant.ml));
+  pushOption("weight", "Weight", firstNonNull(variant.weight, variant.weight_name, variant.g, variant.gr));
+  pushOption("material", "Material", firstNonNull(variant.material, variant.material_name));
+  pushOption("scent", "Scent", firstNonNull(variant.scent, variant.fragrance, variant.perfume));
+  pushOption("flavor", "Flavor", firstNonNull(variant.flavor, variant.flavour, variant.taste));
+  pushOption("pack", "Pack", firstNonNull(variant.pack, variant.package, variant.bundle));
+  pushOption("style", "Style", firstNonNull(variant.style, variant.model));
+
+  const optionSources = [variant.options, variant.option, variant.attributes, variant.attribute, variant.properties, variant.property, variant.specs, variant.specifications, variant.values, variant.variant_options];
+  optionSources.forEach((source) => {
+    if (!source) return;
+    if (Array.isArray(source)) {
+      source.forEach((entry) => {
+        if (!entry || typeof entry !== "object") return;
+        const label = firstNonNull(entry.label, entry.title, entry.name, entry.key, entry.type, entry.attribute, entry.option, "");
+        const value = firstNonNull(entry.value, entry.val, entry.text, entry.title_value, entry.name_value, entry.label_value, entry.code, entry.name, "");
+        pushOption(label, variantOptionLabel(normalizeVariantOptionKey(label)), value, firstNonNull(entry.color, entry.hex, entry.swatch, entry.swatch_color, ""));
+      });
+      return;
+    }
+    if (typeof source === "object") {
+      Object.entries(source).forEach(([key, value]) => {
+        pushOption(key, variantOptionLabel(normalizeVariantOptionKey(key)), value, value?.color || value?.hex || value?.swatch || "");
+      });
+    }
+  });
+
+  return entries;
+}
+
+function variantOptionMap(variant) {
+  if (!variant || typeof variant !== "object") return {};
+  if (variant.__optionMap && typeof variant.__optionMap === "object") return variant.__optionMap;
+  return Object.fromEntries(extractVariantOptionEntries(variant).map((option) => [option.key, option.value]));
+}
+
+function variantMatchesOptions(variant, options = {}) {
+  const map = variantOptionMap(variant);
+  return Object.entries(options)
+    .filter(([, value]) => String(value || "").trim())
+    .every(([key, value]) => map[key] === variantOptionValueKey(value));
+}
+
+function variantKeyValue(variant) {
+  return String(firstNonNull(variant?.__key, variant?.__index, variant?.id, variant?.variant_id, variant?.sku, variant?.code, "") || "");
+}
+
+function storedVariantSelection(productId) {
+  const selected = productId ? state.activeProductVariantSelections[productId] : null;
+  if (selected && typeof selected === "object") {
+    return {
+      variantKey: String(selected.variantKey || ""),
+      options: selected.options && typeof selected.options === "object" ? selected.options : {},
+    };
+  }
+  return {
+    variantKey: String(selected || ""),
+    options: {},
+  };
+}
+
 function activeProductVariant(item) {
   const productId = String(item?.id || "").trim();
   const variants = getItemVariants(item);
   if (!variants.length) return null;
 
-  const selected = productId ? state.activeProductVariantSelections[productId] : "";
-  if (selected) {
-    const byKey = variants.find((variant) => String(variant.__key) === String(selected).trim());
+  const selected = storedVariantSelection(productId);
+  if (selected.variantKey) {
+    const byKey = variants.find((variant) => variantKeyValue(variant) === selected.variantKey);
     if (byKey) return byKey;
 
-    const byIndex = Number(selected);
+    const byIndex = Number(selected.variantKey);
     if (Number.isInteger(byIndex) && variants[byIndex]) {
       return variants[byIndex];
     }
+  }
+
+  if (selected.options && Object.keys(selected.options).length) {
+    const byOptions = variants.find((variant) => variantMatchesOptions(variant, selected.options));
+    if (byOptions) return byOptions;
   }
 
   return variants[0] || null;
@@ -772,18 +907,40 @@ function setActiveProductVariantSelection(productId, variant) {
     return;
   }
 
-  const key = firstNonNull(
-    variant.__key,
-    variant.__index,
-    variant.id,
-    variant.variant_id,
-    variant.sku,
-    variant.code,
-    variant.name,
-    variant.title,
-  );
+  const key = variantKeyValue(variant) || firstNonNull(variant.name, variant.title);
   if (!key) return;
-  state.activeProductVariantSelections[id] = String(key);
+  state.activeProductVariantSelections[id] = {
+    variantKey: String(key),
+    options: variantOptionMap(variant),
+  };
+}
+
+function selectProductVariantOption(productId, optionKey, optionValue) {
+  const id = String(productId || "").trim();
+  const item = getProductById(id);
+  const variants = getItemVariants(item);
+  if (!id || !variants.length) return null;
+
+  const current = activeProductVariant(item) || variants[0];
+  const currentSelection = storedVariantSelection(id);
+  const nextOptions = {
+    ...variantOptionMap(current),
+    ...currentSelection.options,
+    [optionKey]: variantOptionValueKey(optionValue),
+  };
+  const nextVariant =
+    variants.find((variant) => variantMatchesOptions(variant, nextOptions)) ||
+    variants.find((variant) => variantMatchesOptions(variant, { [optionKey]: optionValue })) ||
+    current;
+
+  state.activeProductVariantSelections[id] = {
+    variantKey: variantKeyValue(nextVariant),
+    options: {
+      ...nextOptions,
+      ...variantOptionMap(nextVariant),
+    },
+  };
+  return nextVariant;
 }
 
 function variantPrimaryImage(variant) {
@@ -893,6 +1050,125 @@ function resolveVariantOriginalPrice(variant, fallbackPrice = 0, fallbackOrigina
   return toNumber(fallbackOriginal, 0);
 }
 
+function buildVariantOptionGroups(variants = []) {
+  const groups = new Map();
+  variants.forEach((variant) => {
+    const options = Array.isArray(variant.__options) && variant.__options.length ? variant.__options : extractVariantOptionEntries(variant);
+    options.forEach((option) => {
+      if (!groups.has(option.key)) {
+        groups.set(option.key, {
+          key: option.key,
+          label: option.label || variantOptionLabel(option.key),
+          values: new Map(),
+        });
+      }
+      const group = groups.get(option.key);
+      if (!group.values.has(option.value)) {
+        group.values.set(option.value, {
+          value: option.value,
+          display: option.display,
+          swatch: option.swatch,
+          variants: [],
+        });
+      }
+      group.values.get(option.value).variants.push(variant);
+    });
+  });
+
+  return Array.from(groups.values())
+    .map((group) => ({
+      ...group,
+      values: Array.from(group.values.values()),
+    }))
+    .filter((group) => group.values.length > 1);
+}
+
+function renderVariantFallbackButtons(variants, productId, selectedVariant) {
+  const activeKey = variantKeyValue(selectedVariant);
+  return `
+    <div class="shade-grid" role="group" aria-label="Select variant">
+      ${variants
+        .map((variant) => {
+          const key = variantKeyValue(variant);
+          const isActive = key && activeKey ? key === activeKey : variant === selectedVariant;
+          const color = variantSwatchColor(variant);
+          if (isColorLike(color)) {
+            return `
+              <button class="shade-dot ${isActive ? "is-active" : ""}" type="button" data-variant-product="${escapeHtml(productId)}" data-variant-key="${escapeHtml(key)}" aria-label="${escapeHtml(variantLabel(variant, variant.__index || 0))}">
+                <span style="--shade:${escapeHtml(color)}"></span>
+              </button>
+            `;
+          }
+
+          const fullLabel = variantLabel(variant, variant.__index || 0);
+          const label = variantChipLabel(variant, variant.__index || 0);
+          return `
+            <button class="shade-dot ${isActive ? "is-active" : ""}" type="button" data-variant-product="${escapeHtml(productId)}" data-variant-key="${escapeHtml(key)}" aria-label="${escapeHtml(fullLabel)}">
+              <span class="shade-dot-label" title="${escapeHtml(fullLabel)}">${escapeHtml(label)}</span>
+            </button>
+          `;
+        })
+        .join("")}
+    </div>
+  `;
+}
+
+function renderVariantOptionGroups(variants, productId, selectedVariant) {
+  const groups = buildVariantOptionGroups(variants);
+  if (!groups.length) return renderVariantFallbackButtons(variants, productId, selectedVariant);
+
+  const selection = storedVariantSelection(productId);
+  const selectedOptions = {
+    ...variantOptionMap(selectedVariant),
+    ...selection.options,
+  };
+
+  return `
+    <div class="variant-option-groups">
+      ${groups
+        .map((group) => `
+          <div class="variant-option-group">
+            <div class="variant-option-head">
+              <strong>${escapeHtml(group.label || variantOptionLabel(group.key))}</strong>
+              <span>${escapeHtml(group.key === "color" && selectedOptions[group.key] ? "Selected" : group.values.find((entry) => entry.value === selectedOptions[group.key])?.display || "Choose one")}</span>
+            </div>
+            <div class="variant-option-values" role="group" aria-label="Select ${escapeHtml(group.label || group.key)}">
+              ${group.values
+                .map((option) => {
+                  const nextOptions = { ...selectedOptions, [group.key]: option.value };
+                  const isAvailable =
+                    variants.some((variant) => variantMatchesOptions(variant, nextOptions)) ||
+                    variants.some((variant) => variantMatchesOptions(variant, { [group.key]: option.value }));
+                  const isActive = selectedOptions[group.key] === option.value;
+                  const swatch = option.swatch || (group.key === "color" ? option.display : "");
+                  const colorMarkup = group.key === "color" && isColorLike(swatch)
+                    ? `<span class="variant-option-swatch" style="--shade:${escapeHtml(swatch)}"></span>`
+                    : "";
+                  const textMarkup = group.key === "color" && colorMarkup ? "" : `<span>${escapeHtml(option.display)}</span>`;
+                  return `
+                    <button
+                      class="variant-option-button ${group.key === "color" ? "variant-option-button--color" : ""} ${isActive ? "is-active" : ""}"
+                      type="button"
+                      data-variant-option-product="${escapeHtml(productId)}"
+                      data-variant-option-name="${escapeHtml(group.key)}"
+                      data-variant-option-value="${escapeHtml(option.value)}"
+                      aria-pressed="${isActive ? "true" : "false"}"
+                      ${isAvailable ? "" : "disabled"}
+                    >
+                      ${colorMarkup}
+                      ${textMarkup}
+                    </button>
+                  `;
+                })
+                .join("")}
+            </div>
+          </div>
+        `)
+        .join("")}
+    </div>
+  `;
+}
+
 function renderVariantSection(item) {
   const variants = getItemVariants(item);
   if (!variants.length) {
@@ -924,50 +1200,17 @@ function renderVariantSection(item) {
 
   const productId = String(item?.id || "").trim();
   const selectedVariant = activeProductVariant(item);
-  const activeKey = String(selectedVariant?.__key || selectedVariant?.__index || "").trim();
   const heading = selectedVariant ? variantLabel(selectedVariant, selectedVariant?.__index || 0) : "Choose variant";
 
   return `
     <section class="shade-section">
       <div class="shade-head">
         <div>
-          <strong>Variant: ${escapeHtml(heading)}</strong>
+          <strong>Selected: ${escapeHtml(heading)}</strong>
           <span class="shade-count">${variants.length} ${variants.length === 1 ? "variant" : "variants"}</span>
         </div>
       </div>
-      <div class="shade-grid" role="group" aria-label="Select variant">
-        ${variants
-          .map((variant) => {
-            const key = String(
-              firstNonNull(
-                variant.__key,
-                variant.__index,
-                variant.id,
-                variant.variant_id,
-                variant.sku,
-                variant.code,
-              ) || "",
-            );
-            const isActive = key && activeKey ? key === activeKey : variant === selectedVariant;
-            const color = variantSwatchColor(variant);
-            if (isColorLike(color)) {
-              return `
-                <button class="shade-dot ${isActive ? "is-active" : ""}" type="button" data-variant-product="${escapeHtml(productId)}" data-variant-key="${escapeHtml(key)}" aria-label="${escapeHtml(variantLabel(variant, variant.__index || 0))}">
-                  <span style="--shade:${escapeHtml(color)}"></span>
-                </button>
-              `;
-            }
-
-            const fullLabel = variantLabel(variant, variant.__index || 0);
-            const label = variantChipLabel(variant, variant.__index || 0);
-            return `
-              <button class="shade-dot ${isActive ? "is-active" : ""}" type="button" data-variant-product="${escapeHtml(productId)}" data-variant-key="${escapeHtml(key)}" aria-label="${escapeHtml(fullLabel)}">
-                <span class="shade-dot-label" title="${escapeHtml(fullLabel)}">${escapeHtml(label)}</span>
-              </button>
-            `;
-          })
-          .join("")}
-      </div>
+      ${renderVariantOptionGroups(variants, productId, selectedVariant)}
     </section>
   `;
 }
@@ -4764,6 +5007,7 @@ export {
   renderProductImage,
   renderProductPage,
   renderShopPage,
+  selectProductVariantOption,
   route,
   setActiveProductVariantSelection,
   setCartQuantity,
