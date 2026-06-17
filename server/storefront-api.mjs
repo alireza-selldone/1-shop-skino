@@ -1,8 +1,10 @@
-import { STOREFRONT_SHOP_HANDLE, STOREFRONT_XAPI_BASE } from "./config.mjs";
+import { SHOP_ID, STOREFRONT_SHOP_HANDLE, STOREFRONT_XAPI_BASE } from "./config.mjs";
 import { readJsonBody, sendJson } from "./http.mjs";
 import { ensureAccessToken } from "./auth.mjs";
 
 const STOREFRONT_PHYSICAL_BASKET_TYPE = "physical";
+const STOREFRONT_NEWSLETTER_STREAM_ACCESS_KEY =
+  process.env.STOREFRONT_NEWSLETTER_STREAM_ACCESS_KEY || "STREAM-KEY-14952-web-BIRFnzrzoJEDqVaBK71REBGg";
 
 function firstArray(...values) {
   return values.find((value) => Array.isArray(value)) || [];
@@ -29,6 +31,23 @@ export async function handleStorefrontApi(req, res, url, storefrontSession = nul
 
   if ((pathname === "/api/storefront/blogs" || pathname === "/api/storefront/blog") && req.method === "GET") {
     const result = await fetchStorefrontBlogs(url);
+    sendJson(res, result.ok ? 200 : result.status || 502, result);
+    return true;
+  }
+
+  if (pathname === "/api/storefront/newsletter") {
+    if (req.method !== "POST") {
+      sendJson(res, 405, {
+        ok: false,
+        source: "storefront_newsletter",
+        error: "Newsletter signup requires a POST request.",
+        method: req.method,
+      });
+      return true;
+    }
+
+    const payload = await readJsonBody(req).catch(() => ({}));
+    const result = await subscribeStorefrontNewsletter(payload);
     sendJson(res, result.ok ? 200 : result.status || 502, result);
     return true;
   }
@@ -1031,6 +1050,74 @@ async function requestStorefrontXapi(endpoint, label) {
       status: 502,
       endpoint: publicStorefrontEndpoint(endpoint),
       error: error.message || `Selldone storefront ${label} request failed.`,
+    };
+  }
+}
+
+async function subscribeStorefrontNewsletter(payload = {}) {
+  const email = String(payload?.email || "").trim().toLowerCase();
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    return { ok: false, source: "storefront_newsletter", status: 422, error: "Enter a valid email address." };
+  }
+
+  const streamKey = String(STOREFRONT_NEWSLETTER_STREAM_ACCESS_KEY || "").trim();
+  if (!streamKey) {
+    return {
+      ok: false,
+      source: "storefront_newsletter",
+      status: 500,
+      error: "Newsletter stream access key is not configured.",
+    };
+  }
+
+  const body = {
+    email,
+    subscribed: true,
+    source: String(payload?.source || "storefront_footer").trim() || "storefront_footer",
+    page: String(payload?.page || "").trim() || null,
+    tags: ["newsletter", "special_offers"],
+  };
+
+  const endpoint = new URL(`${STOREFRONT_XAPI_BASE}/shops/${encodeURIComponent(String(SHOP_ID))}/audience/${encodeURIComponent(streamKey)}`);
+  const publicEndpoint = { ...publicStorefrontEndpoint(endpoint), method: "POST" };
+  try {
+    const response = await fetch(endpoint, {
+      method: "POST",
+      headers: {
+        Accept: "application/json",
+        "Content-Type": "application/json",
+        "X-Requested-With": "XMLHttpRequest",
+      },
+      body: JSON.stringify(body),
+    });
+    const responsePayload = await readStorefrontResponsePayload(response);
+    const storefrontError = detectStorefrontApiError(responsePayload, response.status);
+
+    if (!response.ok || storefrontError) {
+      return {
+        ok: false,
+        source: "storefront_newsletter",
+        status: storefrontError?.status || response.status,
+        endpoint: publicEndpoint,
+        error: storefrontError?.error || readStorefrontApiMessage(responsePayload) || `${response.statusText || "Selldone newsletter request failed."} (${response.status}).`,
+        payload: responsePayload,
+      };
+    }
+
+    return {
+      ok: true,
+      source: "storefront_newsletter",
+      endpoint: publicEndpoint,
+      message: readStorefrontApiMessage(responsePayload) || "You're signed up for news and special offers.",
+      payload: responsePayload,
+    };
+  } catch (error) {
+    return {
+      ok: false,
+      source: "storefront_newsletter",
+      status: 502,
+      endpoint: publicEndpoint,
+      error: error?.message || "Selldone newsletter request failed.",
     };
   }
 }

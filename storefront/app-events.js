@@ -1,4 +1,4 @@
-import * as storefront from "./app-core.js?v=storefront-variant-boxes-20260617";
+import * as storefront from "./app-core.js?v=storefront-newsletter-ux-20260617";
 
 const {
   state,
@@ -326,10 +326,96 @@ export function registerStorefrontInteractions() {
     });
   });
 
-  document.querySelector("[data-newsletter-form]")?.addEventListener("submit", (event) => {
+  const newsletterForm = document.querySelector("[data-newsletter-form]");
+  const newsletterStorageKey = "pajulina:newsletter-email";
+  const showNewsletterSubscribedState = (form, email = "") => {
+    const message = form.querySelector("[data-newsletter-message]");
+    form.classList.add("is-subscribed");
+    form.querySelector('input[name="email"]')?.setAttribute("hidden", "");
+    form.querySelector('button[type="submit"]')?.setAttribute("hidden", "");
+    if (message) {
+      message.classList.remove("is-error");
+      message.classList.add("is-success");
+      message.textContent = email ? `You're on the list: ${email}` : "You're on the list. Watch your inbox for updates.";
+    }
+  };
+
+  try {
+    const rememberedNewsletterEmail = window.localStorage?.getItem(newsletterStorageKey) || "";
+    if (newsletterForm && rememberedNewsletterEmail) showNewsletterSubscribedState(newsletterForm, rememberedNewsletterEmail);
+  } catch {
+    // Ignore storage access errors in private or restricted browser modes.
+  }
+
+  newsletterForm?.addEventListener("submit", (event) => {
     event.preventDefault();
-    event.currentTarget.reset();
-    showToast("Thanks for signing up");
+    const form = event.currentTarget;
+    const emailInput = form.querySelector('input[name="email"]');
+    const submitButton = form.querySelector('button[type="submit"]');
+    const message = form.querySelector("[data-newsletter-message]");
+    const email = String(emailInput?.value || "").trim();
+
+    if (!email || !emailInput?.checkValidity()) {
+      if (message) {
+        message.classList.remove("is-success");
+        message.classList.add("is-error");
+        message.textContent = "Enter a valid email address.";
+      }
+      showToast("Enter a valid email address.");
+      emailInput?.focus();
+      return;
+    }
+
+    const previousLabel = submitButton?.textContent || "Sign up";
+    if (submitButton) {
+      submitButton.disabled = true;
+      submitButton.textContent = "Signing up...";
+    }
+    if (message) {
+      message.classList.remove("is-success", "is-error");
+      message.textContent = "";
+    }
+
+    fetch("/api/storefront/newsletter", {
+      method: "POST",
+      headers: {
+        Accept: "application/json",
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        email,
+        source: "storefront_footer",
+        page: window.location.hash || "#home",
+      }),
+    })
+      .then(async (response) => {
+        const payload = await response.json().catch(() => ({}));
+        if (!response.ok || payload?.ok === false) {
+          throw new Error(payload?.error || "Could not sign up for emails.");
+        }
+        try {
+          window.localStorage?.setItem(newsletterStorageKey, email);
+        } catch {
+          // Ignore storage access errors in private or restricted browser modes.
+        }
+        showNewsletterSubscribedState(form, email);
+        showToast(payload?.message || "You're signed up for news and offers.");
+      })
+      .catch((error) => {
+        const text = error?.message || "Could not sign up for emails.";
+        if (message) {
+          message.classList.remove("is-success");
+          message.classList.add("is-error");
+          message.textContent = text;
+        }
+        showToast(text);
+      })
+      .finally(() => {
+        if (submitButton) {
+          submitButton.disabled = false;
+          submitButton.textContent = previousLabel;
+        }
+      });
   });
 
   document.addEventListener("submit", (event) => {
