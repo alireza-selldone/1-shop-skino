@@ -1,6 +1,11 @@
 import { selldoneImagePathToUrl } from "/dashboard/features/selldone-images.js?v=storefront-cart-image-20260614b";
-import { renderOrderHistoryPage } from "./order-history.js?v=storefront-orders-products-20260620";
-import { createStorefrontPayments } from "./payments.js?v=storefront-orders-products-20260620";
+import { renderHomePage as renderHomePageModule } from "./home-page.js?v=storefront-category-menu-restore-20260620";
+import { renderProductPage as renderProductPageModule } from "./product-page.js?v=storefront-category-menu-restore-20260620";
+import { renderUserMenu } from "./user-menu.js?v=storefront-category-menu-restore-20260620";
+import { renderAccountProfileOverviewPage } from "./account-profile.js?v=storefront-category-menu-restore-20260620";
+import { renderOrderHistoryPage } from "./order-history.js?v=storefront-category-menu-restore-20260620";
+import { renderOrderDetailPage } from "./order-detail.js?v=storefront-category-menu-restore-20260620";
+import { createStorefrontPayments } from "./payments.js?v=storefront-category-menu-restore-20260620";
 
 const SPRITE_COLUMNS = 4;
 const SPRITE_ROWS = 4;
@@ -375,6 +380,28 @@ function buildCategoryCardsFromProducts(rawProducts = []) {
 
 function getCategoryCards() {
   return state.categoryCards;
+}
+
+function hasProductDiscount(item = {}) {
+  const price = Number(item.price || 0);
+  const original = Number(item.original || item.originalPrice || 0);
+  return Number.isFinite(original) && Number.isFinite(price) && original > price;
+}
+
+function productMerchPriority(item = {}) {
+  const source = `${item.key || ""} ${item.label || ""} ${item.title || ""} ${item.category || ""}`.toLowerCase();
+  const priority = [
+    ["skincare", "skin", "cream", "serum", "glow"],
+    ["makeup", "lip", "beauty", "cosmetic"],
+    ["hair", "shampoo", "conditioner"],
+    ["fragrance", "perfume", "scent"],
+  ];
+  const index = priority.findIndex((group) => group.some((word) => source.includes(word)));
+  return index >= 0 ? index : priority.length;
+}
+
+function sortByMerchPriority(list = []) {
+  return [...list].sort((a, b) => productMerchPriority(a) - productMerchPriority(b));
 }
 
 function sortCategoryCards(cards = []) {
@@ -2158,1061 +2185,16 @@ function buildAccountLogoutUrl() {
 }
 
 function renderAccountMenu() {
-  if (!els.accountMenu) return;
-  const user = state.sessionUser || {};
-  const name = userDisplayName(user);
-  if (!state.sessionAuthenticated) {
-    els.accountMenu.innerHTML = `
-      <div class="account-menu-user">
-        <div class="account-menu-avatar" aria-hidden="true">?</div>
-        <div class="account-menu-meta">
-          <strong>Guest</strong>
-          <p>Log in to see your profile</p>
-        </div>
-      </div>
-      <div class="account-menu-links">
-        <button class="black-button account-menu-login" type="button" data-account-menu-login>Log in</button>
-      </div>
-    `;
-    return;
-  }
-
-  const avatar = resolveUserAvatarUrl(user, "big");
-  const contact = firstNonNull(user?.email, user?.phone, user?.username, "");
-  els.accountMenu.innerHTML = `
-    <div class="account-menu-user">
-      <div class="account-menu-avatar" aria-hidden="true">
-        ${
-          avatar
-            ? `<img src="${escapeHtml(avatar)}" alt="${escapeHtml(name || "Profile")} avatar" />`
-            : `<span>${escapeHtml(userInitials(user))}</span>`
-        }
-      </div>
-      <div class="account-menu-meta">
-        <strong>${escapeHtml(name || "Selldone user")}</strong>
-        ${contact ? `<p>${escapeHtml(contact)}</p>` : ""}
-      </div>
-    </div>
-    <div class="account-menu-links">
-      <button class="account-menu-link" type="button" data-account-menu-cart>
-        <span><b class="account-menu-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M7 8h10l1.2 12H5.8L7 8ZM9 8a3 3 0 0 1 6 0" /></svg></b> Current bag</span>
-        <small>Review active Selldone cart</small>
-      </button>
-      <a class="account-menu-link" href="#account/orders" data-account-menu-orders>
-        <span><b class="account-menu-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="m4 7 8-4 8 4-8 4-8-4Zm0 0v10l8 4 8-4V7M12 11v10" /></svg></b> Order history</span>
-        <small>View your previous purchases</small>
-      </a>
-      <a class="account-menu-link" href="#account/profile" data-account-menu-profile>
-        <span><b class="account-menu-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M20 21a8 8 0 0 0-16 0M12 13a5 5 0 1 0 0-10 5 5 0 0 0 0 10Z" /></svg></b> Profile</span>
-        <small>Account and contact details</small>
-      </a>
-      <a class="account-menu-logout" href="${buildAccountLogoutUrl()}"><b class="account-menu-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M15 17l5-5-5-5M20 12H9M11 21H5a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h6" /></svg></b> Log out</a>
-    </div>
-  `;
-}
-
-function setAccountMenuOpen(open) {
-  const nextState = Boolean(open);
-  state.accountMenuOpen = nextState;
-  if (els.accountButton) {
-    els.accountButton.setAttribute("aria-expanded", String(nextState));
-  }
-  if (els.accountControl) {
-    els.accountControl.classList.toggle("is-open", nextState);
-  }
-}
-
-function closeAccountMenu() {
-  setAccountMenuOpen(false);
-}
-
-function toggleAccountMenu() {
-  setAccountMenuOpen(!state.accountMenuOpen);
-}
-
-function categoryMenuHref(key) {
-  const normalized = String(key || "").trim();
-  if (!normalized || normalized === "all") return "#shop";
-  return `#shop?category=${encodeURIComponent(normalized)}`;
-}
-
-function categoryProductCount(key) {
-  const normalized = asSafeCategory(key);
-  if (!normalized || normalized === "all") return productTotal();
-  return getProductsForUi().filter((item) => asSafeCategory(item.category) === normalized).length;
-}
-
-function renderCategoryMenuItem(key, label, image) {
-  const normalized = String(key || "all").trim() || "all";
-  const count = categoryProductCount(normalized);
-  return `
-    <a class="category-menu-item" href="${categoryMenuHref(normalized)}" data-category-menu-link>
-      <span class="category-menu-media">
-        ${normalized === "all" ? renderSprite(0, "category-menu-sprite") : renderCategoryMedia(image)}
-      </span>
-      <span class="category-menu-copy">
-        <strong>${escapeHtml(label || titleCase(normalized))}</strong>
-        <small>${count} ${count === 1 ? "item" : "items"}</small>
-      </span>
-      <span class="category-menu-arrow" aria-hidden="true">›</span>
-    </a>
-  `;
-}
-
-function renderCategoryMenu() {
-  if (!els.categoryMenuList) return;
-  const categories = [["all", "All products", 0], ...getCategoryCards()];
-  els.categoryMenuList.innerHTML = categories.length
-    ? categories.map(([key, label, image]) => renderCategoryMenuItem(key, label, image)).join("")
-    : `<p class="category-menu-empty">Categories are loading from Selldone.</p>`;
-}
-
-function setCategoryMenuOpen(open) {
-  const nextState = Boolean(open);
-  state.categoryMenuOpen = nextState;
-  if (nextState) renderCategoryMenu();
-  document.body.classList.toggle("category-menu-open", nextState);
-  els.categoryMenu?.classList.toggle("is-open", nextState);
-  els.categoryMenu?.setAttribute("aria-hidden", String(!nextState));
-}
-
-function openCategoryMenu() {
-  setCategoryMenuOpen(true);
-}
-
-function closeCategoryMenu() {
-  setCategoryMenuOpen(false);
-}
-
-function getCheckoutTransportations() {
-  return state.shopTransportationsLoaded ? state.shopTransportations : [];
-}
-
-function resolveCheckoutTransport(transportations, selectedKey) {
-  const normalized = normalizeShopTransportations(transportations);
-  if (!normalized.length) return null;
-
-  const selected = pickTransportByKey(normalized, selectedKey);
-  if (selected) return selected;
-  return normalized[0];
-}
-
-function currentCheckoutShippingKey(transportations = []) {
-  const normalized = normalizeShopTransportations(transportations);
-  if (!state.activeCheckoutShippingKey && normalized.length) {
-    state.activeCheckoutShippingKey = transportSelectionKey(normalized[0], "checkout-default");
-  }
-
-  return state.activeCheckoutShippingKey || (normalized[0] ? transportSelectionKey(normalized[0], "checkout-default") : "shipping-default");
-}
-
-function renderDataStatus() {
-  if (state.isLoading) {
-    return `<p class="mini-note" role="status">Fetching latest products from Selldone...</p>`;
-  }
-  if (state.loadError) {
-    return `<p class="mini-note" role="status">${escapeHtml(state.loadError)}</p>`;
-  }
-  if (state.dataSource === DATA_SOURCE.xapi) {
-    return `<p class="mini-note" role="status">Showing ${productTotal()} live products from Selldone XAPI.</p>`;
-  }
-  return `<p class="mini-note" role="status">Waiting for Selldone XAPI catalog.</p>`;
-}
-
-async function bootstrapProducts() {
-  if (state.productsLoaded && state.dataSource === DATA_SOURCE.xapi) return;
-  state.isLoading = true;
-  state.loadError = null;
-  try {
-    await fetchXapiProducts();
-    state.productsLoaded = true;
-  } catch (error) {
-    state.products = [];
-    state.folders = [];
-    state.categoryCards = [];
-    state.dataSource = DATA_SOURCE.xapi;
-    state.activeCategory = "all";
-    state.loadError = `Could not load live Selldone XAPI products. ${error.message || ""}`.trim();
-    state.productsLoaded = true;
-    console.error("Selldone XAPI load failed:", error);
-  } finally {
-    state.isLoading = false;
-  }
-}
-
-function parseHash() {
-  const raw = window.location.hash.slice(1) || "home";
-  const [pathWithAnchor, queryString = ""] = raw.split("?");
-  const path = pathWithAnchor.split("#")[0] || "home";
-  const parts = String(path || "home")
-    .split("/")
-    .map((part) => part.trim())
-    .filter((part) => part.length);
-  const route = parts[0] || "home";
-  const id = parts[1] || "";
-  const query = new URLSearchParams(queryString);
-  return { route, id, query };
-}
-
-function setHash(route, params = {}) {
-  const query = new URLSearchParams(params);
-  const suffix = query.toString() ? `?${query}` : "";
-  window.location.hash = `${route}${suffix}`;
-}
-
-async function route() {
-  setPageLoading(true);
-  try {
-    await bootstrapProducts();
-    if (state.isLoading) return;
-    await fetchSessionStatus();
-    if (state.sessionAuthenticated) {
-      await hydrateStorefrontCart();
-    }
-    updateAccountButton();
-    closeAccountMenu();
-
-    const { route: routeName, id, query } = parseHash();
-    syncRouteSearch(query);
-    sanitizeActiveCategory();
-
-    if (routeName === "shop") {
-      state.activeProductId = null;
-      state.activeProductGallery = [];
-      renderShopPage();
-    } else if (routeName === "product") {
-      const productId = String(id || state.activeProductId || "").trim();
-      if (!productId) {
-        state.activeProductId = null;
-        state.activeProductGallery = [];
-        setHash("shop");
-        return;
-      }
-      await renderProductPage(productId);
-    } else if (routeName === "checkout") {
-      await renderCheckoutPage();
-    } else if (routeName === "blog" || routeName === "blogs") {
-      await renderBlogPage(id, query);
-    } else if (routeName === "account") {
-      await renderAccountProfilePage(id);
-    } else {
-      state.activeProductId = null;
-      state.activeProductGallery = [];
-      await ensureBlogsLoaded();
-      renderHomePage();
-    }
-
-    updateNav(routeName);
-    window.scrollTo({ top: 0, behavior: "auto" });
-  } finally {
-    setPageLoading(false);
-  }
-}
-
-function updateNav(routeName) {
-  document.querySelectorAll("[data-nav-link]").forEach((link) => {
-    const key = link.dataset.navLink;
-    const isBlog = (routeName === "blog" || routeName === "blogs") && key === "blog";
-    const isShop = routeName === "shop" && key !== "events" && key !== "blog";
-    link.classList.toggle("is-active", isShop || isBlog);
+  return renderUserMenu({
+    state,
+    els,
+    escapeHtml,
+    firstNonNull,
+    userDisplayName,
+    userInitials,
+    resolveUserAvatarUrl,
+    buildAccountLogoutUrl,
   });
-}
-
-function renderLiveCatalogEmptyState(title, body) {
-  els.app.innerHTML = `
-    <div class="page-shell">
-      ${renderDataStatus()}
-      <section class="section live-empty-state">
-        <h1>${escapeHtml(title)}</h1>
-        <p>${escapeHtml(body)}</p>
-        <button class="black-button" type="button" data-retry-catalog>Retry catalog</button>
-      </section>
-    </div>
-  `;
-}
-
-function hasProductDiscount(item) {
-  return toNumber(item?.discount, 0) > 0 || (toNumber(item?.original, 0) > 0 && toNumber(item?.original, 0) > toNumber(item?.price, 0));
-}
-
-function productMerchText(item) {
-  const folder = item?.folder || {};
-  const categories = Array.isArray(item?.categories)
-    ? item.categories.map((category) => [category?.name, category?.title, category?.slug, category?.category_name].filter(Boolean).join(" ")).join(" ")
-    : "";
-  return [
-    item?.brand,
-    item?.key,
-    item?.label,
-    item?.title,
-    item?.category,
-    item?.subcategory,
-    item?.description,
-    item?.sku,
-    folder?.name,
-    folder?.title,
-    folder?.slug,
-    folder?.category_name,
-    categories,
-  ]
-    .filter(Boolean)
-    .join(" ")
-    .toLowerCase();
-}
-
-function productMerchPriority(item) {
-  const text = productMerchText(item);
-  const isEye = /\b(eye|eyes|eyeliner|mascara|brow|eyebrow|eyelash|lashes|shadow|eyeshadow|undereye|under-eye|kohl|liner)\b|چشم|ابرو|مژه/i.test(text);
-  const isTube = /\b(tube|tubed|squeeze|cream tube|gel tube|lotion tube)\b|تیوب/i.test(text);
-  const isSkin =
-    /\b(skin|skincare|skin-care|face|facial|cream|creme|moisturizer|moisturiser|serum|sunscreen|spf|cleanser|toner|mask|balm|lotion|hydrating|hydrate|anti-aging|antiage|dermal|derma|jar|pot|tub)\b|پوست|کرم|آبرسان|مرطوب/i.test(
-      text,
-    );
-
-  if (isSkin && !isTube && !isEye) return 0;
-  if (isSkin && isTube && !isEye) return 1;
-  if (isEye) return 3;
-  return 2;
-}
-
-function sortByMerchPriority(products) {
-  return [...products].sort(
-    (a, b) =>
-      productMerchPriority(a) - productMerchPriority(b) ||
-      Number(hasProductDiscount(b)) - Number(hasProductDiscount(a)) ||
-      toNumber(b.rating, 0) - toNumber(a.rating, 0) ||
-      productTimeValue(b) - productTimeValue(a),
-  );
-}
-
-function homeDeals(products, limit, offset = 0) {
-  const discounted = sortByMerchPriority(products.filter(hasProductDiscount));
-  const source = discounted.length >= offset + 1 ? discounted : sortByMerchPriority(products);
-  return source.slice(offset, offset + limit);
-}
-
-function homeRecommended(products, limit) {
-  return [...products]
-    .sort(
-      (a, b) =>
-        productMerchPriority(a) - productMerchPriority(b) ||
-        toNumber(b.rating, 0) - toNumber(a.rating, 0) ||
-        toNumber(b.reviews, 0) - toNumber(a.reviews, 0),
-    )
-    .slice(0, limit);
-}
-
-function homeNewProducts(products, limit) {
-  return [...products]
-    .sort((a, b) => productMerchPriority(a) - productMerchPriority(b) || productTimeValue(b) - productTimeValue(a))
-    .slice(0, limit);
-}
-
-function productTimeValue(item) {
-  const value = Date.parse(item?.createdAt || item?.updatedAt || "");
-  return Number.isFinite(value) ? value : toNumber(item?.id, 0);
-}
-
-function renderHeroCarousel() {
-  const total = heroSlides.length;
-  const activeIndex = ((state.activeHeroSlide % total) + total) % total;
-  const trackOffset = activeIndex * 100;
-
-  return `
-    <section class="hero-carousel" aria-label="Cosmetic shop highlights" data-hero-carousel>
-      <div class="hero-carousel-track" data-hero-track style="transform: translateX(-${trackOffset}%);">
-        ${heroSlides
-          .map(
-            (slide, index) => `
-              <article
-                class="hero-slide ${index === activeIndex ? "is-active" : ""}"
-                style="--hero-image:url('${slide.image}');--hero-pos:${slide.position};--hero-accent:${slide.accent};"
-                aria-hidden="${index === activeIndex ? "false" : "true"}"
-              >
-                <div class="hero-copy">
-                  <span class="eyebrow">${escapeHtml(slide.eyebrow)}</span>
-                  <h1>${escapeHtml(slide.title)}</h1>
-                  <p>${escapeHtml(slide.body)}</p>
-                  <a class="pill-button" href="${escapeHtml(slide.href)}">${escapeHtml(slide.cta)}</a>
-                </div>
-              </article>
-            `,
-          )
-          .join("")}
-      </div>
-      <div class="hero-controls" aria-label="Hero carousel controls">
-        <button class="hero-arrow" type="button" data-hero-step="-1" aria-label="Previous hero slide">&lsaquo;</button>
-        <div class="hero-dots" role="tablist" aria-label="Hero slides">
-          ${heroSlides
-            .map(
-              (slide, index) => `
-                <button
-                  class="hero-dot ${index === activeIndex ? "is-active" : ""}"
-                  type="button"
-                  data-hero-slide="${index}"
-                  role="tab"
-                  aria-label="${escapeHtml(slide.eyebrow)}"
-                  aria-selected="${index === activeIndex ? "true" : "false"}"
-                ></button>
-              `,
-            )
-            .join("")}
-        </div>
-        <button class="hero-arrow" type="button" data-hero-step="1" aria-label="Next hero slide">&rsaquo;</button>
-      </div>
-    </section>
-  `;
-}
-
-function renderHomePage() {
-  const products = getProductsForUi();
-  if (!products.length) {
-    renderLiveCatalogEmptyState("Selldone XAPI catalog is unavailable", "The storefront is configured to use live Selldone XAPI data only.");
-    return;
-  }
-
-  const deals = homeDeals(products, 4);
-  const today = homeDeals(products, 6, 4);
-  const recommended = homeRecommended(products, 4);
-  const newItems = homeNewProducts(products, 4);
-
-  els.app.innerHTML = `
-    <div class="page-shell">
-      ${renderDataStatus()}
-      ${renderHeroCarousel()}
-      <section class="promo-grid" aria-label="Featured offers">
-        <article class="promo-card hot">
-          <div class="promo-body">
-            <span class="eyebrow">Rewards are glowing</span>
-            <h1>Members save up to 20%</h1>
-            <p>Fresh color, daily skin care, and easy gifts for every routine.</p>
-            <a class="pill-button light" href="#shop?discount=1">Shop discounts</a>
-            <div class="promo-discs" aria-hidden="true">
-              <span>diamond<br />20%</span>
-              <span>platinum<br />15%</span>
-              <span>member<br />10%</span>
-            </div>
-          </div>
-        </article>
-        <article class="promo-card orange">
-          <img src="assets/beauty-hero.png" alt="" />
-          <div class="promo-body">
-            <span class="eyebrow">Only here</span>
-            <h2>Worth the obsession</h2>
-            <p>Beauty finds with color, glow, and staying power.</p>
-            <a class="pill-button" href="#shop">Shop now</a>
-          </div>
-        </article>
-        <article class="promo-card blue">
-          <img src="assets/beauty-hero.png" alt="" />
-          <div class="promo-body">
-            <span class="eyebrow">Summer beauty</span>
-            <h2>New arrivals, loading...</h2>
-            <p>Bright skin, softer lips, easy shine.</p>
-            <a class="pill-button" href="#shop?category=skincare">Shop new</a>
-          </div>
-        </article>
-      </section>
-
-      ${renderProductSection("Deals for you", `${deals.length} items`, deals, "product-row")}
-      ${renderDealStrip("Today's deals", today)}
-
-      <section class="section" id="events">
-        <div class="event-band">
-          <div class="event-lead">
-            <span class="eyebrow">In-store inspiration</span>
-            <h2>Come see us!</h2>
-            <a class="pill-button light" href="#shop">Find a store</a>
-          </div>
-          ${eventTile("Bronze to bridal", "Warm color lessons for every glow.", "22% 55%")}
-          ${eventTile("Beauty services", "Fresh styling, shade matching, and skin prep.", "54% 48%")}
-          ${eventTile("In-store beauty event", "Meet new favorites and trending routines.", "70% 48%")}
-          ${eventTile("Selfie-ready skin", "Soft glam looks with easy everyday steps.", "86% 45%")}
-        </div>
-      </section>
-
-      <section class="section">
-        <div class="section-head">
-          <div>
-            <h2>The beauty everyone wants, only here</h2>
-            <p>Curated edits for color, care, fragrance, and tools.</p>
-          </div>
-        </div>
-        <div class="feature-grid">
-          ${featureCard("Pajulina Beauty Collection", "Clean color and easy everyday shine.", "12% 55%")}
-          ${featureCard("DIBS Beauty", "Cool girl color for lips and cheeks.", "35% 45%")}
-          ${featureCard("Live Tinted", "Skin-first makeup for warm radiance.", "58% 48%")}
-          ${featureCard("isima", "Hair care made for bounce and shine.", "80% 48%")}
-        </div>
-      </section>
-
-      ${renderProductSection("We think you'll like", `${recommended.length} items`, recommended, "product-row")}
-      ${renderBlogTeaserSection()}
-
-      <section class="section">
-        <div class="gift-banner">
-          <div class="gift-copy">
-            <h2>Find a gift Dad will love</h2>
-            <p>Ask Pajulina AI for personalized picks, from skin care to fragrance.</p>
-            <a class="text-link" href="#shop?category=gifts">Start chat</a>
-          </div>
-          <div class="gift-image" role="img" aria-label="Beauty gifts and cosmetics"></div>
-        </div>
-      </section>
-
-      <section class="section">
-        <div class="obsession-strip">
-          <div class="obsession-copy">
-            <h2>Worth the obsession</h2>
-            <a class="text-link" href="#shop">Shop now</a>
-          </div>
-          ${storyCard("A routine that feels like a treat", "Skin care favorites for fresh starts.", "24% 52%")}
-          ${storyCard("Most fragrant", "Easy scents for day and night.", "50% 52%")}
-          ${storyCard("Detector mode", "Find color, texture, and glow in one place.", "66% 48%")}
-          ${storyCard("Glow-worthy acts", "Care picks that keep skin feeling soft.", "85% 48%")}
-        </div>
-      </section>
-
-      ${renderProductSection("New for you", `${newItems.length} items`, newItems, "product-row")}
-
-      <section class="section-tight">
-        <div class="coupon-band">
-          <div>
-            <strong>20% off your first purchase</strong>
-            <span>When you sign up for Pajulina emails. Exclusions apply.</span>
-          </div>
-          <a class="text-link" href="#shop">See details</a>
-        </div>
-      </section>
-
-      <section class="section">
-        <div class="section-head">
-          <h2>Shop by Category</h2>
-        </div>
-        <div class="category-grid">
-          ${getCategoryCards().map(([key, label, image]) => categoryCard(key, label, image)).join("")}
-        </div>
-      </section>
-
-      <section class="section">
-        <div class="section-head">
-          <h2>All things Pajulina Beauty</h2>
-        </div>
-        <div class="magazine-row">
-          ${storyCard("Pride, Amplified", "Joyful color made for every day.", "18% 52%", true)}
-          ${storyCard("Apply to be a part of the 2026 Muse cohort", "Creators, artists, and beauty voices.", "42% 50%", true)}
-          ${storyCard("Join the Pajulina Beauty Community today", "Tips, events, and new favorites.", "60% 50%", true)}
-          ${storyCard("Give a Pajulina Beauty gift card", "The easiest gift for every routine.", "86% 45%", true)}
-        </div>
-      </section>
-    </div>
-  `;
-}
-
-function renderShopPage() {
-  if (!getProductsForUi().length) {
-    renderLiveCatalogEmptyState("No live products loaded", "The shop page is waiting for products from Selldone XAPI.");
-    return;
-  }
-
-  const filtered = getFilteredProducts();
-  els.app.innerHTML = `
-    <div class="page-shell">
-      ${renderDataStatus()}
-      <nav class="breadcrumbs" aria-label="Breadcrumbs">
-        <a href="#home">Home</a><span>/</span><span>Makeup</span><span>/</span><span>Face</span><span>/</span><strong>Featured Beauty</strong>
-      </nav>
-      <section class="shop-hero">
-        <div class="shop-hero-copy">
-          <span class="eyebrow">Discover the refreshed</span>
-          <h1>Pajulina Beauty Collection</h1>
-          <p>Cruelty free beauty with clean ingredients, fresh color, and everyday ease.</p>
-        </div>
-        <div class="shop-hero-image" role="img" aria-label="Pajulina beauty collection products"></div>
-      </section>
-
-      <section class="section-tight">
-        <div class="editorial-row">
-          ${featureCard("Glossy lips, soft cheeks", "Color that feels light and fresh.", "12% 55%")}
-          ${featureCard("Beauty, assembled", "Routine-ready favorites for every bag.", "48% 50%")}
-          ${featureCard("Face the summer", "SPF, tint, and glow for warm days.", "78% 48%")}
-          ${featureCard("Gifts that glow", "Little luxuries, easy to love.", "88% 45%")}
-        </div>
-      </section>
-
-      <section class="section">
-        <div class="section-head">
-          <div>
-            <h1>${shopHeading()}</h1>
-            <p>${filtered.length} items</p>
-          </div>
-        </div>
-        <div class="shop-toolbar">
-          ${(() => {
-            const chips = [["all", "All"], ...getCategoryCards().map(([key, label]) => [key, label])];
-            return `<div class="filter-bar" role="group" aria-label="Filter by category">
-              ${discountFilterChip()}
-              ${chips.map(([key, label]) => filterChip(key, label)).join("")}
-            </div>`;
-          })()}
-          <select class="sort-select" aria-label="Sort products" data-sort-select>
-            <option value="featured" ${state.activeSort === "featured" ? "selected" : ""}>Sort by Featured</option>
-            <option value="price-low" ${state.activeSort === "price-low" ? "selected" : ""}>Price: low to high</option>
-            <option value="price-high" ${state.activeSort === "price-high" ? "selected" : ""}>Price: high to low</option>
-            <option value="rating" ${state.activeSort === "rating" ? "selected" : ""}>Top rated</option>
-            <option value="new" ${state.activeSort === "new" ? "selected" : ""}>New arrivals</option>
-          </select>
-        </div>
-        <div class="shop-grid">
-          ${filtered.map((item) => productCard(item)).join("")}
-        </div>
-        <div class="load-more">
-          <span>You are viewing ${filtered.length} of ${productTotal()} items</span>
-          <button class="black-button" type="button">Load more</button>
-        </div>
-      </section>
-    </div>
-  `;
-}
-
-async function renderBlogPage(articleId = "", query = new URLSearchParams()) {
-  await ensureBlogsLoaded();
-
-  if (articleId) {
-    await renderBlogArticlePage(articleId);
-    return;
-  }
-
-  const activeCategory = toSlug(query.get("category") || "all") || "all";
-  const filtered = activeCategory === "all"
-    ? state.blogs
-    : state.blogs.filter((article) => toSlug(article.category) === activeCategory);
-  const featured = filtered[0] || null;
-  const rest = featured ? filtered.slice(1) : filtered;
-
-  if (state.blogsLoadError) {
-    renderLiveCatalogEmptyState("Selldone blog is unavailable", state.blogsLoadError);
-    return;
-  }
-
-  els.app.innerHTML = `
-    <div class="page-shell">
-      <nav class="breadcrumbs" aria-label="Blog path">
-        <a href="#home">Home</a><span>/</span><strong>Blog</strong>
-      </nav>
-
-      <section class="blog-hero">
-        <div>
-          <span class="eyebrow">Pajulina journal</span>
-          <h1>Beauty routines, storefront updates, and selling ideas.</h1>
-          <p>${state.blogTotal || filtered.length} posts synced from Selldone blog content.</p>
-        </div>
-        ${featured ? renderBlogCard(featured, { compact: true }) : `<div class="blog-empty-card">No blog posts are published yet.</div>`}
-      </section>
-
-      <section class="section">
-        <div class="section-head">
-          <div>
-            <h2>All posts</h2>
-            <p>${filtered.length} visible articles</p>
-          </div>
-          <a class="text-link" href="#shop">Shop products</a>
-        </div>
-        ${renderBlogCategoryChips(activeCategory)}
-        ${filtered.length ? `<div class="blog-grid">${rest.map((article) => renderBlogCard(article)).join("")}</div>` : `<div class="blog-empty-card">No posts matched this category.</div>`}
-      </section>
-    </div>
-  `;
-}
-
-async function renderBlogArticlePage(articleId) {
-  const article = await ensureBlogArticleLoaded(articleId);
-  if (!article) {
-    renderLiveCatalogEmptyState("Blog article was not found", "This post is not available in the current Selldone blog feed.");
-    return;
-  }
-
-  const related = state.blogs.filter((entry) => entry.id !== article.id).slice(0, 3);
-  els.app.innerHTML = `
-    <div class="page-shell">
-      <nav class="breadcrumbs" aria-label="Blog article path">
-        <a href="#home">Home</a><span>/</span><a href="#blog">Blog</a><span>/</span><strong>${escapeHtml(article.title)}</strong>
-      </nav>
-
-      <article class="blog-article">
-        <header class="blog-article-head">
-          <div class="blog-meta">
-            <span>${escapeHtml(article.category || "Beauty Notes")}</span>
-            ${blogArticleDate(article) ? `<span>${escapeHtml(blogArticleDate(article))}</span>` : ""}
-            <span>${escapeHtml(article.author || "Pajulina")}</span>
-          </div>
-          <h1>${escapeHtml(article.title)}</h1>
-          ${article.description ? `<p>${escapeHtml(article.description)}</p>` : ""}
-        </header>
-        ${renderBlogImage(article, "blog-article-media")}
-        <div class="blog-article-body">
-          ${renderBlogBody(article)}
-        </div>
-      </article>
-
-      ${related.length ? `
-        <section class="section">
-          <div class="section-head">
-            <div>
-              <h2>More from the blog</h2>
-              <p>${related.length} articles</p>
-            </div>
-            <a class="text-link" href="#blog">All posts</a>
-          </div>
-          <div class="blog-preview-grid">
-            ${related.map((entry) => renderBlogCard(entry, { compact: true })).join("")}
-          </div>
-        </section>
-      ` : ""}
-    </div>
-  `;
-}
-
-async function renderProductPage(productId) {
-  const id = String(productId || "").trim() || String(state.activeProductId || "").trim();
-  const cachedProduct = id ? getProductById(id) : null;
-  let item = cachedProduct;
-
-  if (state.dataSource === DATA_SOURCE.xapi && id) {
-    const needsDetail =
-      !cachedProduct ||
-      !Array.isArray(cachedProduct.images) ||
-      cachedProduct.images.length <= 1 ||
-      productNeedsStorefrontDetail(cachedProduct);
-    if (needsDetail) {
-      const detail = await fetchXapiProductDetail(id);
-      if (detail) {
-        item = detail;
-      }
-    }
-  }
-
-  if (!item) {
-    item = state.dataSource === DATA_SOURCE.xapi ? await fetchXapiProductDetail(id) : null;
-  }
-
-  if (!item) {
-    renderLiveCatalogEmptyState("Product is not available from Selldone XAPI", `Product ID ${id || "unknown"} was not returned by the live storefront API.`);
-    return;
-  }
-  state.activeProductId = item.id;
-  const transportations = await ensureShopTransportationsLoaded();
-  const productTransportSelection = firstNonNull(state.activeProductShippingSelection[item.id], transportSelectionKey(transportations?.[0], "shipping"));
-  if (productTransportSelection && !transportationSelectionExists(transportations, productTransportSelection)) {
-    state.activeProductShippingSelection[item.id] = "";
-  }
-  state.activeProductShippingSelection[item.id] =
-    state.activeProductShippingSelection[item.id] || (transportations.length ? transportSelectionKey(transportations[0], "shipping") : "shipping-default");
-  const deliveryCards = renderDeliveryCards(transportations, {
-    selectedKey: state.activeProductShippingSelection[item.id],
-    productId: item.id,
-    context: "product",
-  });
-
-  const selectedVariant = activeProductVariant(item);
-  const itemPrice = resolveVariantPrice(selectedVariant, toNumber(item.price, 0));
-  const itemOriginal = resolveVariantOriginalPrice(selectedVariant, itemPrice, toNumber(item.original, 0));
-  const addButtonVariantKey = firstNonNull(
-    selectedVariant?.__key,
-    selectedVariant?.__index,
-    selectedVariant?.id,
-    selectedVariant?.variant_id,
-    selectedVariant?.sku,
-    selectedVariant?.code,
-  ) || "";
-  const itemRating = toNumber(item.rating, 0);
-  const itemReviews = toNumber(item.reviews, 0);
-  const category = item.category || "misc";
-  const subcategory = item.subcategory || "product";
-  const description = item.description || "A polished daily essential designed for fresh color, smooth wear, and an easy beauty routine.";
-  const galleryMedia = normalizeGallery(item, selectedVariant) || [];
-  const variantSection = renderVariantSection(item);
-  state.activeProductGallery = galleryMedia.length ? galleryMedia : [item.image ?? 0];
-
-  if (state.activeMedia === null || !state.activeProductGallery.includes(state.activeMedia)) {
-    state.activeMedia = state.activeProductGallery[0];
-  }
-
-  const catalog = getProductsForUi();
-  const related = catalog.filter((entry) => entry.category === category && entry.id !== item.id).slice(0, 4);
-  const similar = catalog.filter((entry) => entry.subcategory === subcategory && entry.id !== item.id).slice(0, 4);
-
-  const catalogItem = (index, alternate = null) => catalog[index] || alternate || null;
-
-  els.app.innerHTML = `
-    <div class="page-shell">
-      <nav class="breadcrumbs" aria-label="Breadcrumbs">
-        <a href="#home">Home</a><span>/</span><a href="#shop">Shop</a><span>/</span><a href="#shop?category=${category}">${escapeHtml(titleCase(category))}</a><span>/</span><strong>${escapeHtml(subcategory)}</strong>
-      </nav>
-      <section class="product-detail-layout">
-        <div class="gallery">
-          <div class="gallery-main">
-            ${renderProductImage(item, "large-sprite", state.activeMedia)}
-            <button class="try-on" type="button">TRY IT ON</button>
-          </div>
-          <div class="thumb-row" aria-label="Product media">
-            ${state.activeProductGallery
-              .map(
-                (image, index) => `
-                  <button class="thumb ${state.activeMedia === image ? "is-active" : ""}" type="button" data-media-index="${index}" aria-label="View product image">
-                    ${renderProductImage(item, "thumbnail-sprite", image)}
-                  </button>
-                `,
-              )
-              .join("")}
-          </div>
-        </div>
-
-        <article class="product-info">
-          <span class="brand">${escapeHtml(item.brand)}</span>
-          <h1>${escapeHtml(item.title)}</h1>
-          <div class="detail-rating">
-            <span class="stars" aria-label="${itemRating} out of 5 stars">*****</span>
-            <strong>${itemRating.toFixed(1)}</strong>
-            <a href="#reviews">${itemReviews.toLocaleString()} reviews</a>
-          </div>
-          <div class="detail-price">
-            ${formatPrice(itemPrice, item.currency)}
-            ${itemOriginal ? `<s>${formatPrice(itemOriginal, item.currency)}</s>` : ""}
-          </div>
-          <p class="points-note">Earn points on this purchase as a Pajulina Rewards member.</p>
-          ${variantSection}
-
-          <section class="delivery-section">
-            <h2 class="product-meta">Pickup and delivery options</h2>
-            ${deliveryCards}
-          </section>
-
-          <div class="detail-actions">
-            <button class="black-button" type="button" data-add-to-cart-product="${item.id}" data-variant-key="${escapeHtml(addButtonVariantKey)}">Add to bag</button>
-            <button class="favorite-button" type="button" aria-label="Add to favorites">
-              <svg viewBox="0 0 24 24" aria-hidden="true">
-                <path d="M20.8 4.6a5.4 5.4 0 0 0-7.6 0L12 5.8l-1.2-1.2a5.4 5.4 0 1 0-7.6 7.6L12 21l8.8-8.8a5.4 5.4 0 0 0 0-7.6Z" />
-              </svg>
-            </button>
-          </div>
-          <div class="promo-box">
-            Members save up to 20% on almost everything in stores and online. Use code <strong>NEWROUTINE</strong>.
-          </div>
-
-          <div class="accordion">
-            ${renderProductProsAccordion(item, description)}
-          </div>
-
-          <section class="bought-box">
-            <h2>Frequently bought together</h2>
-            ${miniProduct(item)}
-            ${miniProduct(catalogItem(2))}
-            ${miniProduct(catalogItem(9))}
-            <button class="black-button" type="button" data-add-to-cart-product="${item.id}" data-variant-key="${escapeHtml(addButtonVariantKey)}">Add set to bag</button>
-          </section>
-
-          <section class="routine-box">
-            <h2>Make it a routine</h2>
-            ${routineStep("Step 1", catalogItem(4))}
-            ${routineStep("Step 2", item)}
-            ${routineStep("Step 3", catalogItem(11))}
-            <button class="black-button" type="button" data-add-to-cart-product="${item.id}" data-variant-key="${escapeHtml(addButtonVariantKey)}">Add set to bag</button>
-          </section>
-        </article>
-      </section>
-
-      ${renderProductSection("We think you'll like", "4 items", related, "product-row")}
-      ${renderProductSection("Similar items for you", "4 items", similar, "product-row")}
-
-      <section class="reviews-block" id="reviews">
-        <div class="section-head">
-          <h2>Reviews</h2>
-          <button class="filter-chip" type="button">Write A Review</button>
-        </div>
-        <div class="review-summary">
-          <div>
-            <div class="rating-big">${itemRating.toFixed(1)}</div>
-            <div class="stars">*****</div>
-            <p class="product-meta">83% recommend this product</p>
-          </div>
-          <div class="review-bars">
-            ${reviewBar("5 stars", 72)}
-            ${reviewBar("4 stars", 15)}
-            ${reviewBar("3 stars", 7)}
-            ${reviewBar("2 stars", 3)}
-            ${reviewBar("1 star", 3)}
-          </div>
-        </div>
-        <article class="review-card">
-          <h3>Smooth finish and easy color match</h3>
-          <p>This became an everyday favorite. It feels lightweight, layers well, and gives a polished finish without looking heavy.</p>
-          <span class="product-meta">Verified buyer</span>
-        </article>
-      </section>
-    </div>
-  `;
-}
-
- function renderProductSection(title, subtitle, items, className) {
-  return `
-    <section class="section">
-      <div class="section-head">
-        <div>
-          <h2>${escapeHtml(title)}</h2>
-          <p>${escapeHtml(subtitle)}</p>
-        </div>
-        <a class="text-link" href="#shop">Shop all</a>
-      </div>
-      <div class="${className}">
-        ${items.map((item) => productCard(item)).join("")}
-      </div>
-    </section>
-  `;
-}
-
-function renderDealStrip(title, items) {
-  return `
-    <section class="section">
-      <div class="section-head">
-        <div>
-          <h2>${escapeHtml(title)}</h2>
-          <p>${items.length} items</p>
-        </div>
-        <a class="text-link" href="#shop">Shop all deals</a>
-      </div>
-      <div class="deal-row">
-        ${items.map((item) => productCard(item, true)).join("")}
-      </div>
-    </section>
-  `;
-}
-
-function productCard(item, compact = false) {
-  const price = toNumber(item.price, 0);
-  const original = toNumber(item.original, 0);
-  const rating = toNumber(item.rating, 0);
-  const reviews = toNumber(item.reviews, 0);
-  const colors = toNumber(item.colors, 1);
-  const sale = original > 0 && original > price;
-  const productVariantKey = firstNonNull(
-    activeProductVariant(item)?.__key,
-    activeProductVariant(item)?.__index,
-    activeProductVariant(item)?.id,
-    activeProductVariant(item)?.variant_id,
-    activeProductVariant(item)?.sku,
-    activeProductVariant(item)?.code,
-  );
-  return `
-    <article class="product-card ${compact ? "deal-card" : ""}">
-      <a class="product-media" href="#product/${item.id}" aria-label="${escapeHtml(item.title)}">
-        ${item.badge ? `<span class="badge">${escapeHtml(item.badge)}</span>` : ""}
-        ${renderProductImage(item)}
-      </a>
-      <div class="product-copy">
-        <span class="shade-count">${colors} ${colors === 1 ? "color" : "colors"}</span>
-        <strong class="brand">${escapeHtml(item.brand)}</strong>
-        <a class="product-title" href="#product/${item.id}">${escapeHtml(item.title)}</a>
-        <div class="rating"><span class="stars">*****</span><span>${rating.toFixed(1)} (${reviews.toLocaleString()})</span></div>
-        <div class="price-line">
-          <span class="${sale ? "sale-price" : ""}">${formatPrice(price, item.currency)}</span>
-          ${sale ? `<s>${formatPrice(original, item.currency)}</s>` : ""}
-        </div>
-        <button class="add-button" type="button" data-add-to-cart-product="${item.id}" data-variant-key="${escapeHtml(productVariantKey || "")}">Add to bag</button>
-      </div>
-    </article>
-  `;
-}
-
-function checkoutLineItem(entry) {
-  const selectedVariant = entry.variant;
-  const variantText = selectedVariant ? variantLabel(selectedVariant, selectedVariant.__index || 0) : "";
-  const linePrice = formatPrice(entry.linePrice, entry.item.currency);
-  const totalPrice = formatPrice(entry.linePrice * entry.qty, entry.item.currency);
-  const productHref = `#product/${encodeURIComponent(String(entry.item.id))}`;
-  return `
-    <article class="checkout-line-item">
-      <a class="checkout-line-media checkout-line-link" href="${productHref}" aria-label="${escapeHtml(entry.item.title)}">
-        ${renderProductImage(entry.item, "thumbnail-sprite", entry.item.image)}
-      </a>
-      <div>
-        <h4><a class="checkout-title-link" href="${productHref}">${escapeHtml(entry.item.title)}</a></h4>
-        ${variantText ? `<p class="product-meta">${escapeHtml(variantText)}</p>` : ""}
-        <p class="product-meta">x${entry.qty}</p>
-      </div>
-      <div class="checkout-line-pricing">
-        <span>${linePrice}</span>
-        <strong>${totalPrice}</strong>
-      </div>
-    </article>
-  `;
-}
-
-function checkoutBillMessages(bill = {}) {
-  const messages = firstArrayValue(bill?.user_messages, bill?.messages, bill?.warnings, bill?.errors);
-  return messages
-    .map((message) => {
-      if (typeof message === "string") return message.trim();
-      if (message && typeof message === "object") return String(firstNonNull(message.message, message.text, message.title, "")).trim();
-      return "";
-    })
-    .filter(Boolean);
-}
-
-const storefrontPayments = createStorefrontPayments({
-  state,
-  firstArrayValue,
-  firstNonNull,
-  escapeHtml,
-  showToast,
-  renderLiveCatalogEmptyState,
-});
-
-function checkoutGateways(currency = "") {
-  return storefrontPayments.checkoutGateways(currency);
-}
-
-function renderCheckoutPaymentOptions(bill = {}, currency = "") {
-  return storefrontPayments.renderCheckoutPaymentOptions(bill, currency);
-}
-
-function checkoutSubmitLabel(bill = {}) {
-  return storefrontPayments.checkoutSubmitLabel(bill);
-}
-
-async function handleStripeCheckoutResult(result = {}, requestPayload = {}) {
-  return storefrontPayments.handleStripeCheckoutResult(result, requestPayload);
-}
-
-function submitRedirectForm(url, method = "GET", fields = {}) {
-  const target = String(url || "").trim();
-  if (!target) return false;
-  const normalizedMethod = String(method || "GET").trim().toUpperCase();
-  if (normalizedMethod === "GET") {
-    window.location.assign(target);
-    return true;
-  }
-  const form = document.createElement("form");
-  form.method = normalizedMethod;
-  form.action = target;
-  form.style.display = "none";
-  Object.entries(fields || {}).forEach(([name, value]) => {
-    if (value === null || value === undefined) return;
-    const input = document.createElement("input");
-    input.type = "hidden";
-    input.name = name;
-    input.value = typeof value === "object" ? JSON.stringify(value) : String(value);
-    form.appendChild(input);
-  });
-  document.body.appendChild(form);
-  form.submit();
-  return true;
-}
-
-function productNeedsStorefrontDetail(item) {
-  const variants = getItemVariants(item);
-  if (!variants.length) return false;
-  return variants.some((variant) => !resolveStorefrontVariantId(variant));
 }
 
 async function renderAccountProfilePage(section = "profile") {
@@ -3240,7 +2222,25 @@ async function renderAccountProfilePage(section = "profile") {
     return;
   }
 
-  const accountSection = String(section || "profile").trim().toLowerCase();
+  const rawAccountSection = String(section || "profile").trim();
+  const [accountPath, accountQuery = ""] = rawAccountSection.split("?");
+  const accountSection = accountPath.toLowerCase();
+  const orderDetailPathMatch = rawAccountSection.match(/^orders\/(.+)$/i);
+  const orderDetailId = orderDetailPathMatch?.[1] || (accountSection === "orders" ? new URLSearchParams(accountQuery).get("detail") : "");
+  if (orderDetailId) {
+    await renderOrderDetailPage({
+      orderId: decodeURIComponent(orderDetailId),
+      state,
+      els,
+      escapeHtml,
+      firstArrayValue,
+      firstNonNull,
+      formatPrice,
+      showToast,
+    });
+    return;
+  }
+
   if (accountSection === "orders" || accountSection === "history") {
     await renderOrderHistoryPage({
       state,
@@ -3254,48 +2254,22 @@ async function renderAccountProfilePage(section = "profile") {
     return;
   }
 
-  const user = state.sessionUser || {};
-  const name = userDisplayName(user) || "Selldone user";
-  const email = user.email || "Not provided";
-  const phone = user.phone || "Not provided";
-  const username = user.username || "Not provided";
-  const address = firstNonNull(user.address, "Not provided");
-  const city = firstNonNull(user.city, "Not provided");
-  const id = Number(user.id || 0);
-  const avatar = resolveUserAvatarUrl(user, "big");
-
-  els.app.innerHTML = `
-    <div class="page-shell">
-      <nav class="breadcrumbs" aria-label="Account path">
-        <a href="#home">Home</a><span>/</span><strong>Account</strong>
-      </nav>
-      <section class="section">
-        <div class="account-profile-panel">
-          <div class="account-profile-head">
-            <div class="account-menu-avatar account-menu-avatar--large" aria-hidden="true">
-              ${avatar ? `<img src="${escapeHtml(avatar)}" alt="${escapeHtml(name)} avatar" />` : `<span>${escapeHtml(userInitials(user))}</span>`}
-            </div>
-            <div>
-              <h1>${escapeHtml(name)}</h1>
-              <p class="product-meta">Profile overview</p>
-            </div>
-          </div>
-          <div class="account-profile-fields">
-            <div class="account-profile-field"><span>Email</span><strong>${escapeHtml(email)}</strong></div>
-            <div class="account-profile-field"><span>Phone</span><strong>${escapeHtml(phone)}</strong></div>
-            <div class="account-profile-field"><span>Username</span><strong>${escapeHtml(username)}</strong></div>
-            <div class="account-profile-field"><span>City</span><strong>${escapeHtml(city)}</strong></div>
-            <div class="account-profile-field"><span>Address</span><strong>${escapeHtml(address)}</strong></div>
-            <div class="account-profile-field"><span>Profile ID</span><strong>${id || "Not available"}</strong></div>
-          </div>
-          <div class="account-profile-actions">
-            <a class="black-button" href="${buildAccountLogoutUrl()}">Log out</a>
-            <a class="text-link" href="#shop">Back to shop</a>
-          </div>
-        </div>
-      </section>
-    </div>
-  `;
+  await renderAccountProfileOverviewPage({
+    state,
+    els,
+    hydrateStorefrontCart,
+    cartEntries,
+    formatOrderCurrency,
+    cartTotalsSummary,
+    formatOrderLineTotal,
+    firstNonNull,
+    formatPrice,
+    escapeHtml,
+    buildAccountLogoutUrl,
+    userDisplayName,
+    resolveUserAvatarUrl,
+    userInitials,
+  });
 }
 
 async function renderCheckoutPage() {
@@ -4850,6 +3824,417 @@ function showToast(message) {
   toast.classList.add("is-visible");
   window.clearTimeout(showToast.timer);
   showToast.timer = window.setTimeout(() => toast.classList.remove("is-visible"), 1500);
+}
+
+function setHash(value, params = null) {
+  const target = String(value || "home").replace(/^#/, "");
+  const query = params && typeof params === "object"
+    ? new URLSearchParams(Object.entries(params).filter(([, paramValue]) => paramValue !== undefined && paramValue !== null && String(paramValue) !== "")).toString()
+    : "";
+  const next = `${target}${query ? `?${query}` : ""}`;
+  if (window.location.hash.replace(/^#/, "") === next) {
+    route();
+    return;
+  }
+  window.location.hash = next;
+}
+
+function parseHash() {
+  const raw = decodeURIComponent(window.location.hash.replace(/^#/, "") || "home");
+  const [path, query = ""] = raw.split("?");
+  const parts = path.split("/").filter(Boolean);
+  const routeName = parts[0] || "home";
+  return {
+    raw,
+    route: routeName,
+    id: parts[1] || "",
+    section: `${parts.slice(1).join("/")}${query ? `?${query}` : ""}`,
+    query,
+    params: new URLSearchParams(query),
+  };
+}
+
+function productCard(item, compact = false) {
+  const price = toNumber(item.price, 0);
+  const original = toNumber(item.original, 0);
+  const rating = toNumber(item.rating, 0);
+  const reviews = toNumber(item.reviews, 0);
+  const colors = toNumber(item.colors, 1);
+  const sale = original > 0 && original > price;
+  const productVariantKey = firstNonNull(
+    activeProductVariant(item)?.__key,
+    activeProductVariant(item)?.__index,
+    activeProductVariant(item)?.id,
+    activeProductVariant(item)?.variant_id,
+    activeProductVariant(item)?.sku,
+    activeProductVariant(item)?.code,
+  );
+  return `
+    <article class="product-card ${compact ? "deal-card" : ""}">
+      <a class="product-media" href="#product/${item.id}" aria-label="${escapeHtml(item.title)}">
+        ${item.badge ? `<span class="badge">${escapeHtml(item.badge)}</span>` : ""}
+        ${renderProductImage(item)}
+      </a>
+      <div class="product-copy">
+        <span class="shade-count">${colors} ${colors === 1 ? "color" : "colors"}</span>
+        <strong class="brand">${escapeHtml(item.brand)}</strong>
+        <a class="product-title" href="#product/${item.id}">${escapeHtml(item.title)}</a>
+        <div class="rating"><span class="stars">*****</span><span>${rating.toFixed(1)} (${reviews.toLocaleString()})</span></div>
+        <div class="price-line">
+          <span class="${sale ? "sale-price" : ""}">${formatPrice(price, item.currency)}</span>
+          ${sale ? `<s>${formatPrice(original, item.currency)}</s>` : ""}
+        </div>
+        <button class="add-button" type="button" data-add-to-cart-product="${item.id}" data-variant-key="${escapeHtml(productVariantKey || "")}">Add to bag</button>
+      </div>
+    </article>
+  `;
+}
+
+async function ensureProductsForPage() {
+  if (!state.productsLoaded || !state.products.length) {
+    await fetchXapiProducts();
+  }
+}
+
+function renderDataStatus() {
+  if (state.isLoading) {
+    return `<p class="mini-note" role="status">Fetching latest products from Selldone...</p>`;
+  }
+  if (state.loadError) {
+    return `<p class="mini-note" role="status">${escapeHtml(state.loadError)}</p>`;
+  }
+  if (state.dataSource === DATA_SOURCE.xapi) {
+    return `<p class="mini-note" role="status">Showing ${productTotal()} live products from Selldone XAPI.</p>`;
+  }
+  return `<p class="mini-note" role="status">Waiting for Selldone XAPI catalog.</p>`;
+}
+
+function productTimeValue(item) {
+  const value = Date.parse(item?.createdAt || item?.updatedAt || "");
+  return Number.isFinite(value) ? value : toNumber(item?.id, 0);
+}
+
+function homeDeals(products, limit, offset = 0) {
+  const discounted = sortByMerchPriority(products.filter(hasProductDiscount));
+  const source = discounted.length >= offset + 1 ? discounted : sortByMerchPriority(products);
+  return source.slice(offset, offset + limit);
+}
+
+function homeRecommended(products, limit) {
+  return [...products]
+    .sort(
+      (a, b) =>
+        productMerchPriority(a) - productMerchPriority(b) ||
+        toNumber(b.rating, 0) - toNumber(a.rating, 0) ||
+        toNumber(b.reviews, 0) - toNumber(a.reviews, 0),
+    )
+    .slice(0, limit);
+}
+
+function homeNewProducts(products, limit) {
+  return [...products]
+    .sort((a, b) => productMerchPriority(a) - productMerchPriority(b) || productTimeValue(b) - productTimeValue(a))
+    .slice(0, limit);
+}
+
+function renderProductSection(title, subtitle, items, className) {
+  return `
+    <section class="section">
+      <div class="section-head">
+        <div>
+          <h2>${escapeHtml(title)}</h2>
+          <p>${escapeHtml(subtitle)}</p>
+        </div>
+        <a class="text-link" href="#shop">Shop all</a>
+      </div>
+      <div class="${className}">
+        ${items.map((item) => productCard(item)).join("")}
+      </div>
+    </section>
+  `;
+}
+
+function renderDealStrip(title, items) {
+  return `
+    <section class="section">
+      <div class="section-head">
+        <div>
+          <h2>${escapeHtml(title)}</h2>
+          <p>${items.length} items</p>
+        </div>
+        <a class="text-link" href="#shop">Shop all deals</a>
+      </div>
+      <div class="deal-row">
+        ${items.map((item) => productCard(item, true)).join("")}
+      </div>
+    </section>
+  `;
+}
+
+
+
+function renderHomePage() {
+  return renderHomePageModule({
+    state,
+    els,
+    heroSlides,
+    escapeHtml,
+    getProductsForUi,
+    renderLiveCatalogEmptyState,
+    homeDeals,
+    homeRecommended,
+    homeNewProducts,
+    renderDataStatus,
+    renderProductSection,
+    renderDealStrip,
+    eventTile,
+    featureCard,
+    renderBlogTeaserSection,
+    storyCard,
+    getCategoryCards,
+    categoryCard,
+  });
+}
+
+async function renderShopPage() {
+  await ensureProductsForPage();
+  syncRouteSearch(parseHash().params);
+  const products = getFilteredProducts();
+  els.app.innerHTML = `
+    <div class="page-shell">
+      ${renderDataStatus()}
+      <nav class="breadcrumbs" aria-label="Breadcrumbs">
+        <a href="#home">Home</a><span>/</span><span>Makeup</span><span>/</span><span>Face</span><span>/</span><strong>Featured Beauty</strong>
+      </nav>
+      <section class="shop-hero">
+        <div class="shop-hero-copy">
+          <span class="eyebrow">Discover the refreshed</span>
+          <h1>Pajulina Beauty Collection</h1>
+          <p>Cruelty free beauty with clean ingredients, fresh color, and everyday ease.</p>
+        </div>
+        <div class="shop-hero-image" role="img" aria-label="Pajulina beauty collection products"></div>
+      </section>
+
+      <section class="section-tight">
+        <div class="editorial-row">
+          ${featureCard("Glossy lips, soft cheeks", "Color that feels light and fresh.", "12% 55%")}
+          ${featureCard("Beauty, assembled", "Routine-ready favorites for every bag.", "48% 50%")}
+          ${featureCard("Face the summer", "SPF, tint, and glow for warm days.", "78% 48%")}
+          ${featureCard("Gifts that glow", "Little luxuries, easy to love.", "88% 45%")}
+        </div>
+      </section>
+
+      <section class="section">
+        <div class="section-head">
+          <div>
+            <h1>${shopHeading()}</h1>
+            <p>${products.length} items</p>
+          </div>
+        </div>
+        <div class="shop-toolbar">
+          ${(() => {
+            const chips = [["all", "All"], ...getCategoryCards().map(([key, label]) => [key, label])];
+            return `<div class="filter-bar" role="group" aria-label="Filter by category">
+              ${discountFilterChip()}
+              ${chips.map(([key, label]) => filterChip(key, label)).join("")}
+            </div>`;
+          })()}
+          <select class="sort-select" aria-label="Sort products" data-sort-select>
+            <option value="featured" ${state.activeSort === "featured" ? "selected" : ""}>Sort by Featured</option>
+            <option value="price-low" ${state.activeSort === "price-low" ? "selected" : ""}>Price: low to high</option>
+            <option value="price-high" ${state.activeSort === "price-high" ? "selected" : ""}>Price: high to low</option>
+            <option value="rating" ${state.activeSort === "rating" ? "selected" : ""}>Top rated</option>
+            <option value="new" ${state.activeSort === "new" ? "selected" : ""}>New arrivals</option>
+          </select>
+        </div>
+        <div class="shop-grid">
+          ${products.map((item) => productCard(item)).join("")}
+        </div>
+        <div class="load-more">
+          <span>You are viewing ${products.length} of ${productTotal()} items</span>
+          <button class="black-button" type="button">Load more</button>
+        </div>
+      </section>
+    </div>
+  `;
+}
+
+async function renderProductPage(productId) {
+  return renderProductPageModule({
+    productId,
+    state,
+    DATA_SOURCE,
+    els,
+    getProductById,
+    fetchXapiProductDetail,
+    productNeedsStorefrontDetail,
+    renderLiveCatalogEmptyState,
+    ensureShopTransportationsLoaded,
+    firstNonNull,
+    transportSelectionKey,
+    transportationSelectionExists,
+    renderDeliveryCards,
+    activeProductVariant,
+    resolveVariantPrice,
+    toNumber,
+    resolveVariantOriginalPrice,
+    normalizeGallery,
+    renderVariantSection,
+    getProductsForUi,
+    escapeHtml,
+    titleCase,
+    renderProductImage,
+    formatPrice,
+    renderProductProsAccordion,
+    miniProduct,
+    routineStep,
+    renderProductSection,
+    reviewBar,
+  });
+}
+
+function productNeedsStorefrontDetail(item) {
+  const variants = getItemVariants(item);
+  if (!variants.length) return false;
+  return variants.some((variant) => !resolveStorefrontVariantId(variant));
+}
+async function renderBlogPage() {
+  await ensureBlogsLoaded();
+  const articles = state.blogs || [];
+  els.app.innerHTML = `
+    <div class="page-shell">
+      <section class="section">
+        <div class="section-heading">
+          <span>Journal</span>
+          <h1>Blog</h1>
+          <p>${articles.length ? "Latest storefront blog posts from Selldone." : state.blogsLoadError || "No blog posts were returned."}</p>
+        </div>
+        ${articles.length ? `<div class="blog-grid">${articles.map((article) => renderBlogCard(article)).join("")}</div>` : ""}
+      </section>
+    </div>
+  `;
+}
+
+function renderLiveCatalogEmptyState(title = "Nothing to show", body = "Please try again.") {
+  els.app.innerHTML = `
+    <div class="page-shell">
+      <section class="section">
+        <div class="account-order-history-empty storefront-empty-state">
+          <strong>${escapeHtml(title)}</strong>
+          <p>${escapeHtml(body)}</p>
+          <div class="account-profile-actions">
+            <a class="black-button" href="#shop">Back to shop</a>
+          </div>
+        </div>
+      </section>
+    </div>
+  `;
+}
+
+async function route() {
+  const current = parseHash();
+  setPageLoading(true);
+  try {
+    if (current.route === "product") {
+      await renderProductPage(current.id);
+    } else if (current.route === "account") {
+      await renderAccountProfilePage(current.section || "profile");
+    } else if (current.route === "checkout") {
+      await renderCheckoutPage();
+    } else if (current.route === "shop") {
+      await renderShopPage();
+    } else if (current.route === "cart" || current.route === "bag") {
+      await renderShopPage();
+      openCart();
+    } else if (current.route === "blog") {
+      await renderBlogPage();
+    } else if (current.route === "home" || current.route === "") {
+      await ensureProductsForPage();
+      renderHomePage();
+    } else {
+      await ensureProductsForPage();
+      renderHomePage();
+    }
+  } catch (error) {
+    renderLiveCatalogEmptyState("Storefront unavailable", error?.message || "Could not open this page.");
+  } finally {
+    setPageLoading(false);
+    updateAccountButton();
+    renderCart();
+  }
+}
+
+function setAccountMenuOpen(open) {
+  const nextState = Boolean(open);
+  state.accountMenuOpen = nextState;
+  if (els.accountButton) {
+    els.accountButton.setAttribute("aria-expanded", String(nextState));
+  }
+  if (els.accountControl) {
+    els.accountControl.classList.toggle("is-open", nextState);
+  }
+}
+
+function closeAccountMenu() {
+  setAccountMenuOpen(false);
+}
+
+function toggleAccountMenu() {
+  setAccountMenuOpen(!state.accountMenuOpen);
+}
+
+function categoryMenuHref(key) {
+  const normalized = String(key || "").trim();
+  if (!normalized || normalized === "all") return "#shop";
+  return `#shop?category=${encodeURIComponent(normalized)}`;
+}
+
+function categoryProductCount(key) {
+  const normalized = asSafeCategory(key);
+  if (!normalized || normalized === "all") return productTotal();
+  return getProductsForUi().filter((item) => asSafeCategory(item.category) === normalized).length;
+}
+
+function renderCategoryMenuItem(key, label, image) {
+  const normalized = String(key || "all").trim() || "all";
+  const count = categoryProductCount(normalized);
+  return `
+    <a class="category-menu-item" href="${categoryMenuHref(normalized)}" data-category-menu-link>
+      <span class="category-menu-media">
+        ${normalized === "all" ? renderSprite(0, "category-menu-sprite") : renderCategoryMedia(image)}
+      </span>
+      <span class="category-menu-copy">
+        <strong>${escapeHtml(label || titleCase(normalized))}</strong>
+        <small>${count} ${count === 1 ? "item" : "items"}</small>
+      </span>
+      <span class="category-menu-arrow" aria-hidden="true">›</span>
+    </a>
+  `;
+}
+
+function renderCategoryMenu() {
+  if (!els.categoryMenuList) return;
+  const categories = [["all", "All products", 0], ...getCategoryCards()];
+  els.categoryMenuList.innerHTML = categories.length
+    ? categories.map(([key, label, image]) => renderCategoryMenuItem(key, label, image)).join("")
+    : `<p class="category-menu-empty">Categories are loading from Selldone.</p>`;
+}
+
+function setCategoryMenuOpen(open) {
+  const nextState = Boolean(open);
+  state.categoryMenuOpen = nextState;
+  if (nextState) renderCategoryMenu();
+  document.body.classList.toggle("category-menu-open", nextState);
+  els.categoryMenu?.classList.toggle("is-open", nextState);
+  els.categoryMenu?.setAttribute("aria-hidden", String(!nextState));
+}
+
+function openCategoryMenu() {
+  setCategoryMenuOpen(true);
+}
+
+function closeCategoryMenu() {
+  setCategoryMenuOpen(false);
 }
 
 function navigateToAccount(nextRoute = "") {

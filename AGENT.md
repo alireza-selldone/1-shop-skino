@@ -114,3 +114,5 @@ This project is a custom Selldone storefront plus backoffice dashboard. Follow t
 - Do not commit `.env`, tokens, secrets, or generated local runtime files.
 - When adding a new source file, immediately add it to git with an explicit `git add <path>` so it is not missed in the next push.
 - If a new rule, Selldone API behavior, image conversion case, or UI convention is discovered and applied, update this `AGENT.md` in the same change.
+
+- Storefront order detail must load through local endpoint `GET /api/storefront/orders/{basket_id}`, which proxies XAPI `GET /shops/@{shop}/baskets/{basket_id}` with the storefront customer token.

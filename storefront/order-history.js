@@ -38,6 +38,10 @@ function orderIdentifier(order = {}, firstNonNull) {
   return String(firstNonNull(order.code, order.order_code, order.orderCode, order.id, order.basket_id, order.basketId, "") || "").trim();
 }
 
+function orderDetailIdentifier(order = {}, firstNonNull) {
+  return String(firstNonNull(order.basket_id, order.basketId, order.id, order.code, order.order_code, order.orderCode, "") || "").trim();
+}
+
 function orderCurrency(order = {}, firstNonNull) {
   return String(firstNonNull(order.currency, order.currency_code, order.bill?.currency, order.payment?.currency, "USD") || "USD").trim();
 }
@@ -247,6 +251,8 @@ function renderOrderCard(order, deps) {
   const visibleItems = items.slice(0, 8);
   const totalLabel = Number.isFinite(total) ? formatPrice(total, currency) : "Unavailable";
   const itemCountLabel = `${items.length} ${items.length === 1 ? "item" : "items"}`;
+  const detailId = orderDetailIdentifier(order, firstNonNull);
+  const detailHref = detailId ? `#account/orders?detail=${encodeURIComponent(detailId)}` : "#account/orders";
 
   return `
     <article class="account-order-card account-order-card--${tone}">
@@ -281,7 +287,10 @@ function renderOrderCard(order, deps) {
       }
       <div class="account-order-footer">
         <span>Synced from Selldone physical basket orders.</span>
-        <a class="text-link" href="#shop">Shop again</a>
+        <div class="account-order-footer-actions">
+          <a class="black-button" href="${escapeHtml(detailHref)}">Details</a>
+          <a class="text-link" href="#shop">Shop again</a>
+        </div>
       </div>
     </article>
   `;

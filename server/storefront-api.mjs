@@ -115,6 +115,13 @@ export async function handleStorefrontApi(req, res, url, storefrontSession = nul
     return true;
   }
 
+  if (pathname.startsWith("/api/storefront/orders/") && req.method === "GET") {
+    const basketId = decodeURIComponent(pathname.slice("/api/storefront/orders/".length)).trim();
+    const result = await fetchStorefrontOrderDetail(storefrontSession, basketId);
+    sendJson(res, result.ok ? 200 : result.status || 502, result);
+    return true;
+  }
+
   if (pathname === "/api/storefront/shop/info" && req.method === "GET") {
     const result = await fetchStorefrontShopInfo();
     sendJson(res, result.ok ? 200 : result.status || 502, result);
@@ -1025,6 +1032,73 @@ async function fetchStorefrontOrderHistory(session, url) {
       status: 502,
       endpoint: publicStorefrontEndpoint(endpoint),
       error: error?.message || "Selldone order history request failed.",
+    };
+  }
+}
+
+async function fetchStorefrontOrderDetail(session, basketId) {
+  const safeBasketId = String(basketId || "").trim();
+  const endpoint = new URL(`${STOREFRONT_XAPI_BASE}/shops/@${STOREFRONT_SHOP_HANDLE}/baskets/${encodeURIComponent(safeBasketId)}`);
+
+  if (!safeBasketId) {
+    return {
+      ok: false,
+      source: "storefront_order_detail",
+      status: 400,
+      endpoint: publicStorefrontEndpoint(endpoint),
+      error: "Basket id is required to load Selldone order details.",
+    };
+  }
+
+  try {
+    const token = await ensureStorefrontToken(session);
+    if (!token) {
+      return {
+        ok: false,
+        source: "storefront_order_detail",
+        status: 401,
+        endpoint: publicStorefrontEndpoint(endpoint),
+        error: "Authentication required to load Selldone order details.",
+      };
+    }
+
+    const response = await fetch(endpoint, {
+      headers: {
+        Accept: "application/json",
+        Authorization: `Bearer ${token}`,
+        "X-Requested-With": "XMLHttpRequest",
+      },
+    });
+    const payload = await readStorefrontResponsePayload(response);
+    const storefrontError = detectStorefrontApiError(payload, response.status);
+
+    if (!response.ok || storefrontError) {
+      return {
+        ok: false,
+        source: "storefront_order_detail",
+        status: storefrontError?.status || response.status,
+        endpoint: publicStorefrontEndpoint(endpoint),
+        error: storefrontError?.error || readStorefrontApiMessage(payload) || `${response.statusText || "Selldone order detail request failed"} (${response.status}).`,
+        payload,
+      };
+    }
+
+    return {
+      ok: true,
+      source: "storefront_order_detail",
+      apiBaseUrl: STOREFRONT_XAPI_BASE,
+      endpoint: publicStorefrontEndpoint(endpoint),
+      basketId: safeBasketId,
+      basket: firstNonNull(payload?.basket, payload?.order, payload?.data?.basket, payload?.data?.order, payload?.result?.basket, payload?.payload?.basket, payload?.data, payload?.result, payload?.payload, payload),
+      payload,
+    };
+  } catch (error) {
+    return {
+      ok: false,
+      source: "storefront_order_detail",
+      status: 502,
+      endpoint: publicStorefrontEndpoint(endpoint),
+      error: error?.message || "Selldone order detail request failed.",
     };
   }
 }
