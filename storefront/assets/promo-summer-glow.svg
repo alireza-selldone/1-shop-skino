@@ -1,0 +1,57 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 560" role="img" aria-label="Summer skin care products with citrus and soft color">
+  <defs>
+    <linearGradient id="sky" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#ecfbff"/>
+      <stop offset="0.48" stop-color="#d8f5ee"/>
+      <stop offset="1" stop-color="#ffe4a8"/>
+    </linearGradient>
+    <linearGradient id="sun" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#ffe36b"/>
+      <stop offset="1" stop-color="#ff9f51"/>
+    </linearGradient>
+    <linearGradient id="green" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#b8efd3"/>
+      <stop offset="1" stop-color="#41b784"/>
+    </linearGradient>
+    <linearGradient id="coral" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#ffb7a4"/>
+      <stop offset="1" stop-color="#ff6f72"/>
+    </linearGradient>
+    <filter id="drop" x="-30%" y="-30%" width="160%" height="160%">
+      <feDropShadow dx="0" dy="20" stdDeviation="18" flood-color="#4b8067" flood-opacity="0.2"/>
+    </filter>
+  </defs>
+  <rect width="900" height="560" rx="34" fill="url(#sky)"/>
+  <circle cx="764" cy="88" r="92" fill="url(#sun)" opacity="0.82"/>
+  <path d="M0 405c122-58 242-65 360-22 133 48 278 82 540 11v166H0z" fill="#fff9eb" opacity="0.8"/>
+  <path d="M90 92c78 38 106 102 94 190-78-40-112-102-94-190z" fill="#7bd3a6" opacity="0.44"/>
+  <path d="M150 64c64 38 84 91 58 160-60-37-82-87-58-160z" fill="#47be89" opacity="0.38"/>
+  <g filter="url(#drop)">
+    <rect x="494" y="136" width="116" height="278" rx="32" fill="#ffffff"/>
+    <rect x="514" y="160" width="76" height="230" rx="26" fill="url(#green)"/>
+    <rect x="642" y="232" width="108" height="182" rx="26" fill="#fbd1bc"/>
+    <rect x="662" y="188" width="68" height="64" rx="22" fill="#fff6ed"/>
+    <rect x="672" y="273" width="58" height="98" rx="16" fill="#ffffff" opacity="0.28"/>
+    <rect x="356" y="206" width="70" height="208" rx="23" fill="url(#coral)"/>
+    <rect x="372" y="162" width="38" height="54" rx="14" fill="#ffffff"/>
+    <rect x="248" y="280" width="92" height="134" rx="24" fill="#f7e2ce"/>
+    <ellipse cx="294" cy="280" rx="46" ry="16" fill="#fff8ef"/>
+  </g>
+  <g>
+    <circle cx="184" cy="376" r="48" fill="#ffb34f"/>
+    <circle cx="184" cy="376" r="31" fill="#fff6c4"/>
+    <path d="M184 328v96M136 376h96M150 342l68 68M218 342l-68 68" stroke="#ff9b38" stroke-width="5" opacity="0.6"/>
+    <circle cx="124" cy="412" r="32" fill="#ffdb6c"/>
+    <circle cx="124" cy="412" r="19" fill="#fff7c6"/>
+  </g>
+  <g opacity="0.75">
+    <path d="M704 146c22-54 58-86 112-104" stroke="#fff2bd" stroke-width="14" stroke-linecap="round"/>
+    <path d="M744 162c36-34 76-48 122-44" stroke="#ffcf67" stroke-width="12" stroke-linecap="round"/>
+    <path d="M668 166c-12-43-2-84 31-123" stroke="#8bdab7" stroke-width="12" stroke-linecap="round"/>
+  </g>
+  <g fill="#ffffff" opacity="0.38">
+    <circle cx="70" cy="148" r="36"/>
+    <circle cx="824" cy="298" r="28"/>
+    <circle cx="440" cy="84" r="18"/>
+  </g>
+</svg>

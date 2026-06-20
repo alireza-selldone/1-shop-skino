@@ -85,35 +85,35 @@ export function renderHomePage(deps) {
     <div class="page-shell">
       ${renderDataStatus()}
       ${renderHeroCarousel({ state, heroSlides, escapeHtml })}
-      <section class="promo-grid" aria-label="Featured offers">
-        <article class="promo-card hot">
+      <section class="promo-grid promo-grid--editorial" aria-label="Featured offers">
+        <article class="promo-card hot promo-card--membership">
           <div class="promo-body">
             <span class="eyebrow">Rewards are glowing</span>
             <h1>Members save up to 20%</h1>
             <p>Fresh color, daily skin care, and easy gifts for every routine.</p>
             <a class="pill-button light" href="#shop?discount=1">Shop discounts</a>
             <div class="promo-discs" aria-hidden="true">
-              <span>diamond<br />20%</span>
-              <span>platinum<br />15%</span>
-              <span>member<br />10%</span>
+              <span><strong>diamond</strong><em>20%</em></span>
+              <span><strong>platinum</strong><em>15%</em></span>
+              <span><strong>member</strong><em>10%</em></span>
             </div>
           </div>
         </article>
-        <article class="promo-card orange">
-          <img src="assets/beauty-hero.png" alt="" />
+        <article class="promo-card orange promo-card--image promo-card--ritual">
+          <img src="assets/promo-obsession-still.svg" alt="" />
           <div class="promo-body">
             <span class="eyebrow">Only here</span>
             <h2>Worth the obsession</h2>
-            <p>Beauty finds with color, glow, and staying power.</p>
+            <p>Soft-focus essentials for lips, skin, and everyday glow.</p>
             <a class="pill-button" href="#shop">Shop now</a>
           </div>
         </article>
-        <article class="promo-card blue">
-          <img src="assets/beauty-hero.png" alt="" />
+        <article class="promo-card blue promo-card--image promo-card--summer">
+          <img src="assets/promo-summer-glow.svg" alt="" />
           <div class="promo-body">
             <span class="eyebrow">Summer beauty</span>
-            <h2>New arrivals, loading...</h2>
-            <p>Bright skin, softer lips, easy shine.</p>
+            <h2>New arrivals, glowing now</h2>
+            <p>Sunlit skin care, sheer color, and fresh shine.</p>
             <a class="pill-button" href="#shop?category=skincare">Shop new</a>
           </div>
         </article>
