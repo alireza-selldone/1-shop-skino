@@ -1,11 +1,11 @@
 import { selldoneImagePathToUrl } from "/dashboard/features/selldone-images.js?v=storefront-cart-image-20260614b";
-import { renderHomePage as renderHomePageModule } from "./home-page.js?v=storefront-category-menu-restore-20260620";
-import { renderProductPage as renderProductPageModule } from "./product-page.js?v=storefront-category-menu-restore-20260620";
-import { renderUserMenu } from "./user-menu.js?v=storefront-category-menu-restore-20260620";
-import { renderAccountProfileOverviewPage } from "./account-profile.js?v=storefront-category-menu-restore-20260620";
-import { renderOrderHistoryPage } from "./order-history.js?v=storefront-category-menu-restore-20260620";
-import { renderOrderDetailPage } from "./order-detail.js?v=storefront-category-menu-restore-20260620";
-import { createStorefrontPayments } from "./payments.js?v=storefront-category-menu-restore-20260620";
+import { renderHomePage as renderHomePageModule } from "./home-page.js?v=storefront-blog-parent-detail-20260620";
+import { renderProductPage as renderProductPageModule } from "./product-page.js?v=storefront-blog-parent-detail-20260620";
+import { renderUserMenu } from "./user-menu.js?v=storefront-blog-parent-detail-20260620";
+import { renderAccountProfileOverviewPage } from "./account-profile.js?v=storefront-blog-parent-detail-20260620";
+import { renderOrderHistoryPage } from "./order-history.js?v=storefront-blog-parent-detail-20260620";
+import { renderOrderDetailPage } from "./order-detail.js?v=storefront-blog-parent-detail-20260620";
+import { createStorefrontPayments } from "./payments.js?v=storefront-blog-parent-detail-20260620";
 
 const SPRITE_COLUMNS = 4;
 const SPRITE_ROWS = 4;
@@ -1405,7 +1405,20 @@ function mapBlogArticle(raw, index = 0) {
     ? firstNonNull(raw.user.name, raw.user.username, raw.user.profile?.name, "")
     : firstNonNull(raw.author, raw.writer, "");
   const description = String(firstNonNull(raw.description, raw.summary, raw.excerpt, raw.subtitle, "")).trim();
-  const content = String(firstNonNull(raw.body, raw.content, raw.html, raw.article, raw.text, "")).trim();
+  const nestedArticle = raw.article && typeof raw.article === "object" ? raw.article : {};
+  const content = String(firstNonNull(
+    raw.body,
+    raw.content,
+    raw.html,
+    raw.text,
+    raw.article_body,
+    raw.body_html,
+    raw.content_html,
+    nestedArticle.body,
+    nestedArticle.content,
+    nestedArticle.html,
+    "",
+  )).trim();
 
   return {
     ...raw,
@@ -1422,6 +1435,10 @@ function mapBlogArticle(raw, index = 0) {
     published: !falseyFlag(raw.published),
     private: truthyFlag(raw.private),
   };
+}
+
+function blogArticleHasFullContent(article = {}) {
+  return Boolean(String(firstNonNull(article?.content, article?.body, article?.html, "") || "").trim());
 }
 
 function applyStorefrontBlogs(payload) {
@@ -1487,16 +1504,35 @@ async function ensureBlogArticleLoaded(articleId) {
       payload?.blog,
       payload?.data?.article,
       payload?.data?.blog,
+      payload?.result?.article,
+      payload?.result?.blog,
+      payload?.payload?.article,
+      payload?.payload?.blog,
+      payload?.payload?.data?.article,
+      payload?.payload?.data?.blog,
+      payload?.data?.payload?.article,
+      payload?.data?.payload?.blog,
       responseArticles(payload).find((entry) => {
         const needle = String(articleId || "").trim();
-        return String(entry?.id || "") === needle || String(entry?.slug || "") === needle;
+        return [
+          entry?.id,
+          entry?.slug,
+          entry?.parent_id,
+          entry?.parent?.id,
+          entry?.blog_id,
+          entry?.blogId,
+        ].some((value) => String(firstNonNull(value, "")).trim() === needle);
       }),
       null,
     );
-    return upsertBlogArticle(article) || existing;
+    const mapped = upsertBlogArticle(article);
+    if (blogArticleHasFullContent(mapped)) return mapped;
+    state.blogsLoadError = "Selldone did not return the full article content for this post.";
+    return blogArticleHasFullContent(existing) ? existing : null;
   } catch (error) {
     console.warn("Selldone blog article detail fetch failed:", error);
-    return existing;
+    state.blogsLoadError = `Could not load Selldone blog post content. ${error.message || ""}`.trim();
+    return blogArticleHasFullContent(existing) ? existing : null;
   }
 }
 
@@ -1521,7 +1557,8 @@ async function ensureBlogsLoaded(force = false) {
 }
 
 function blogArticleUrl(article) {
-  return `#blog/${encodeURIComponent(String(article?.slug || article?.id || ""))}`;
+  const key = firstNonNull(article?.parent_id, article?.parent?.id, article?.blog_id, article?.blogId, article?.slug, article?.id, "");
+  return `#blog/${encodeURIComponent(String(key))}`;
 }
 
 function blogArticleDate(article) {
@@ -1618,7 +1655,14 @@ function findBlogArticle(articleId) {
     }
   })();
   if (!needle) return null;
-  return state.blogs.find((article) => String(article.id) === needle || String(article.slug) === needle) || null;
+  return state.blogs.find((article) => [
+    article.id,
+    article.slug,
+    article.parent_id,
+    article.parent?.id,
+    article.blog_id,
+    article.blogId,
+  ].some((value) => String(firstNonNull(value, "")).trim() === needle)) || null;
 }
 
 function renderBlogTeaserSection() {
@@ -1635,6 +1679,54 @@ function renderBlogTeaserSection() {
       </div>
       <div class="blog-preview-grid">
         ${items.map((article) => renderBlogCard(article, { compact: true })).join("")}
+      </div>
+    </section>
+  `;
+}
+
+function renderHomeBlogImage(article) {
+  if (typeof article?.image === "number") {
+    return renderSprite(article.image, "blog-sprite");
+  }
+  if (typeof article?.image === "string" && article.image.trim()) {
+    return `<img src="${escapeHtml(article.image)}" alt="${escapeHtml(article.title || "Blog image")}" loading="lazy" />`;
+  }
+  return `<span class="home-blog-fallback">Pajulina Notes</span>`;
+}
+
+function renderHomeBlogTile(article) {
+  const date = blogArticleDate(article);
+  const description = article.description || "Read the latest Pajulina storefront update.";
+  return `
+    <article class="home-blog-tile">
+      <a class="home-blog-media" href="${blogArticleUrl(article)}" aria-label="${escapeHtml(article.title)}">
+        ${renderHomeBlogImage(article)}
+      </a>
+      <div class="home-blog-copy">
+        <div class="blog-meta">
+          <span>${escapeHtml(article.category || "Beauty Notes")}</span>
+          ${date ? `<span>${escapeHtml(date)}</span>` : ""}
+        </div>
+        <h3><a href="${blogArticleUrl(article)}">${escapeHtml(article.title)}</a></h3>
+        <p>${escapeHtml(description)}</p>
+      </div>
+    </article>
+  `;
+}
+
+function renderHomeBlogBand() {
+  const items = state.blogs.slice(0, 4);
+  const loadMessage = state.blogsLoadError || "Blog posts are loading from Selldone.";
+  return `
+    <section class="section" id="journal">
+      <div class="home-blog-band ${items.length ? "" : "home-blog-band--empty"}">
+        <div class="home-blog-lead">
+          <span class="eyebrow">Pajulina journal</span>
+          <h2>Latest beauty notes</h2>
+          <p>${items.length ? "Fresh routines, product stories, and store updates from the Selldone blog." : escapeHtml(loadMessage)}</p>
+          <a class="pill-button light" href="#blog">${items.length ? "View all posts" : "Open blog"}</a>
+        </div>
+        ${items.map((article) => renderHomeBlogTile(article)).join("")}
       </div>
     </section>
   `;
@@ -2081,6 +2173,20 @@ async function fetchSessionStatus(force = false) {
   } finally {
     state.sessionLoading = false;
   }
+}
+
+async function initializeStorefrontSession(options = {}) {
+  const force = Boolean(options.force);
+  const hydrateCart = options.hydrateCart !== false;
+  const authenticated = await fetchSessionStatus(force);
+  updateAccountButton();
+  if (authenticated && hydrateCart) {
+    await hydrateStorefrontCart(force);
+  } else {
+    renderCart();
+  }
+  updateAccountButton();
+  return authenticated;
 }
 
 function storefrontReturnRoute(override = "") {
@@ -3990,6 +4096,7 @@ function renderHomePage() {
     eventTile,
     featureCard,
     renderBlogTeaserSection,
+    renderHomeBlogBand,
     storyCard,
     getCategoryCards,
     categoryCard,
@@ -4115,6 +4222,48 @@ async function renderBlogPage() {
   `;
 }
 
+async function renderBlogArticlePage(articleId) {
+  await ensureBlogsLoaded();
+  const article = await ensureBlogArticleLoaded(articleId);
+  if (!article) {
+    els.app.innerHTML = `
+      <div class="page-shell">
+        <section class="section">
+          <div class="section-heading">
+            <span>Journal</span>
+            <h1>Blog post unavailable</h1>
+            <p>${escapeHtml(state.blogsLoadError || "Could not load this Selldone blog post.")}</p>
+            <a class="pill-button" href="#blog">Back to blog</a>
+          </div>
+        </section>
+      </div>
+    `;
+    return;
+  }
+
+  const date = blogArticleDate(article);
+  els.app.innerHTML = `
+    <div class="page-shell">
+      <article class="blog-article">
+        <header class="blog-article-head">
+          <a class="text-link" href="#blog">Back to blog</a>
+          <div class="blog-meta">
+            <span>${escapeHtml(article.category || "Beauty Notes")}</span>
+            ${date ? `<span>${escapeHtml(date)}</span>` : ""}
+            ${article.author ? `<span>${escapeHtml(article.author)}</span>` : ""}
+          </div>
+          <h1>${escapeHtml(article.title)}</h1>
+          ${article.description ? `<p>${escapeHtml(article.description)}</p>` : ""}
+        </header>
+        ${renderBlogImage(article, "blog-article-media")}
+        <div class="blog-article-body">
+          ${renderBlogBody(article)}
+        </div>
+      </article>
+    </div>
+  `;
+}
+
 function renderLiveCatalogEmptyState(title = "Nothing to show", body = "Please try again.") {
   els.app.innerHTML = `
     <div class="page-shell">
@@ -4146,13 +4295,17 @@ async function route() {
     } else if (current.route === "cart" || current.route === "bag") {
       await renderShopPage();
       openCart();
+    } else if (current.route === "blog" && current.id) {
+      await renderBlogArticlePage(current.id);
     } else if (current.route === "blog") {
       await renderBlogPage();
     } else if (current.route === "home" || current.route === "") {
       await ensureProductsForPage();
+      await ensureBlogsLoaded();
       renderHomePage();
     } else {
       await ensureProductsForPage();
+      await ensureBlogsLoaded();
       renderHomePage();
     }
   } catch (error) {
@@ -4313,6 +4466,7 @@ export {
   getItemVariants,
   getProductById,
   handleCheckoutSubmit,
+  initializeStorefrontSession,
   navigateToAccount,
   openCart,
   openCategoryMenu,

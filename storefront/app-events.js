@@ -1,4 +1,4 @@
-import * as storefront from "./app-core.js?v=storefront-category-menu-restore-20260620";
+import * as storefront from "./app-core.js?v=storefront-blog-parent-detail-20260620";
 
 const {
   state,
@@ -14,6 +14,7 @@ const {
   getItemVariants,
   getProductById,
   handleCheckoutSubmit,
+  initializeStorefrontSession,
   navigateToAccount,
   openCart,
   openCategoryMenu,
@@ -435,6 +436,7 @@ export function registerStorefrontInteractions() {
     }
   });
 
-  renderCart();
-  route();
+  void initializeStorefrontSession({ force: true, hydrateCart: true }).then(() => {
+    route();
+  });
 }

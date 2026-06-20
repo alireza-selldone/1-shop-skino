@@ -63,9 +63,8 @@ export function renderHomePage(deps) {
     renderDataStatus,
     renderProductSection,
     renderDealStrip,
-    eventTile,
     featureCard,
-    renderBlogTeaserSection,
+    renderHomeBlogBand,
     storyCard,
     getCategoryCards,
     categoryCard,
@@ -123,19 +122,7 @@ export function renderHomePage(deps) {
       ${renderProductSection("Deals for you", `${deals.length} items`, deals, "product-row")}
       ${renderDealStrip("Today's deals", today)}
 
-      <section class="section" id="events">
-        <div class="event-band">
-          <div class="event-lead">
-            <span class="eyebrow">In-store inspiration</span>
-            <h2>Come see us!</h2>
-            <a class="pill-button light" href="#shop">Find a store</a>
-          </div>
-          ${eventTile("Bronze to bridal", "Warm color lessons for every glow.", "22% 55%")}
-          ${eventTile("Beauty services", "Fresh styling, shade matching, and skin prep.", "54% 48%")}
-          ${eventTile("In-store beauty event", "Meet new favorites and trending routines.", "70% 48%")}
-          ${eventTile("Selfie-ready skin", "Soft glam looks with easy everyday steps.", "86% 45%")}
-        </div>
-      </section>
+      ${renderHomeBlogBand()}
 
       <section class="section">
         <div class="section-head">
@@ -153,7 +140,6 @@ export function renderHomePage(deps) {
       </section>
 
       ${renderProductSection("We think you'll like", `${recommended.length} items`, recommended, "product-row")}
-      ${renderBlogTeaserSection()}
 
       <section class="section">
         <div class="gift-banner">

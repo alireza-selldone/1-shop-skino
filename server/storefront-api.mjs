@@ -1136,7 +1136,14 @@ async function fetchStorefrontBlog(articleId, url) {
   })();
   const article = firstArray(result.articles, result.blogs, result.data?.articles, result.data?.blogs).find((entry) => {
     if (!entry || typeof entry !== "object") return false;
-    return String(firstNonNull(entry.id, "")).trim() === needle || String(firstNonNull(entry.slug, "")).trim() === needle;
+    return [
+      entry.id,
+      entry.slug,
+      entry.parent_id,
+      entry.parent?.id,
+      entry.blog_id,
+      entry.blogId,
+    ].some((value) => String(firstNonNull(value, "")).trim() === needle);
   });
 
   if (!article) {
@@ -1150,10 +1157,127 @@ async function fetchStorefrontBlog(articleId, url) {
     };
   }
 
+  const detail = await fetchStorefrontBlogDetail(article);
+  if (!detail.ok) {
+    return {
+      ...detail,
+      summary: article,
+    };
+  }
+
   return {
     ...result,
-    article,
+    source: "storefront_xapi_blog_detail",
+    endpoint: detail.endpoint,
+    article: {
+      ...article,
+      ...detail.article,
+    },
+    summary: article,
+    detail: detail.payload,
   };
+}
+
+function extractStorefrontBlogDetailArticle(payload = {}) {
+  return firstNonNull(
+    payload?.article,
+    payload?.data?.article,
+    payload?.result?.article,
+    payload?.payload?.article,
+    payload?.payload?.data?.article,
+    payload?.data?.payload?.article,
+    payload?.audit?.article,
+    payload?.seo?.article,
+    null,
+  );
+}
+
+function storefrontBlogDetailContent(article = {}) {
+  const nestedArticle = article?.article && typeof article.article === "object" ? article.article : {};
+  return String(firstNonNull(
+    article?.body,
+    article?.content,
+    article?.html,
+    article?.text,
+    article?.article_body,
+    article?.body_html,
+    article?.content_html,
+    nestedArticle?.body,
+    nestedArticle?.content,
+    nestedArticle?.html,
+    "",
+  ) || "").trim();
+}
+
+async function fetchStorefrontBlogDetail(summaryArticle = {}) {
+  const blogId = firstNonNull(
+    summaryArticle?.parent_id,
+    summaryArticle?.parent?.id,
+    summaryArticle?.blog_id,
+    summaryArticle?.blogId,
+    summaryArticle?.id,
+    summaryArticle?.article_id,
+    summaryArticle?.articleId,
+    "",
+  );
+  if (!blogId) {
+    return {
+      ok: false,
+      source: "storefront_xapi_blog_detail",
+      status: 400,
+      error: "Blog id is required for Selldone detail fetch.",
+    };
+  }
+
+  const endpoint = new URL(`${STOREFRONT_XAPI_BASE}/shops/@${STOREFRONT_SHOP_HANDLE}/blogs/${encodeURIComponent(String(blogId))}`);
+  try {
+    const response = await fetch(endpoint, {
+      headers: {
+        Accept: "application/json",
+        "X-Requested-With": "XMLHttpRequest",
+      },
+    });
+    const payload = await readStorefrontResponsePayload(response);
+    const explicitError = payload?.error || payload?.error_msg || payload?.error_message;
+    if (!response.ok || explicitError) {
+      return {
+        ok: false,
+        source: "storefront_xapi_blog_detail",
+        status: response.status,
+        endpoint: publicStorefrontEndpoint(endpoint),
+        error: readStorefrontApiMessage(payload) || `${response.statusText || "Selldone article detail request failed"} (${response.status}).`,
+        payload,
+      };
+    }
+
+    const article = extractStorefrontBlogDetailArticle(payload);
+    if (!article || !storefrontBlogDetailContent(article)) {
+      return {
+        ok: false,
+        source: "storefront_xapi_blog_detail",
+        status: 502,
+        endpoint: publicStorefrontEndpoint(endpoint),
+        error: "Selldone article detail response did not include full article content.",
+        payload,
+      };
+    }
+
+    return {
+      ok: true,
+      source: "storefront_xapi_blog_detail",
+      endpoint: publicStorefrontEndpoint(endpoint),
+      payload,
+      article,
+    };
+  } catch (error) {
+    return {
+      ok: false,
+      source: "storefront_xapi_blog_detail",
+      status: 502,
+      endpoint: publicStorefrontEndpoint(endpoint),
+      error: error?.message || "Selldone article detail request failed.",
+    };
+  }
 }
 
 async function fetchStorefrontShopInfo() {
