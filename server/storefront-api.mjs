@@ -59,6 +59,30 @@ export async function handleStorefrontApi(req, res, url, storefrontSession = nul
     return true;
   }
 
+  const productReviewsProductId = storefrontProductReviewsFromApiPath(pathname);
+  if (productReviewsProductId) {
+    if (req.method === "GET") {
+      const result = await fetchStorefrontProductReviews(productReviewsProductId, storefrontSession);
+      sendJson(res, result.ok ? 200 : result.status || 502, result);
+      return true;
+    }
+
+    if (req.method === "POST") {
+      const payload = await readJsonBody(req).catch(() => ({}));
+      const result = await submitStorefrontProductReview(productReviewsProductId, storefrontSession, payload);
+      sendJson(res, result.ok ? 200 : result.status || 502, result);
+      return true;
+    }
+
+    sendJson(res, 405, {
+      ok: false,
+      source: "storefront_product_reviews",
+      error: "Product reviews endpoint accepts only GET and POST requests.",
+      method: req.method,
+    });
+    return true;
+  }
+
   if (pathname === "/api/storefront/basket" && req.method === "GET") {
     const result = await fetchStorefrontBasket(storefrontSession, url);
     sendJson(res, result.ok ? 200 : result.status || 502, result);
@@ -144,7 +168,7 @@ export async function handleStorefrontApi(req, res, url, storefrontSession = nul
 
   const productId = storefrontProductIdFromApiPath(pathname);
   if (productId && req.method === "GET") {
-    const result = await fetchStorefrontProduct(productId);
+    const result = await fetchStorefrontProduct(productId, storefrontSession);
     sendJson(res, result.ok ? 200 : result.status || 502, result);
     return true;
   }
@@ -1004,15 +1028,29 @@ function normalizeStorefrontBasketPayload(payload = {}) {
   const rawVariantId = rawVariantCandidates.find((value) => value !== undefined && value !== null && String(value).trim() !== "");
   const variantId = Number.parseInt(rawVariantId, 10);
   const currency = String(source.currency || "").trim();
+  const deliveryInfo = source.delivery_info && typeof source.delivery_info === "object" ? source.delivery_info : null;
+  const shipping = source.shipping && typeof source.shipping === "object" ? source.shipping : null;
+  const shippingKey = String(firstNonNull(source.shipping_key, source.shippingKey, deliveryInfo?.shipping_key, deliveryInfo?.key, shipping?.shipping_key, shipping?.key, "") || "").trim();
   return {
     count: Number.isFinite(count) && count > 0 ? count : 1,
     ...(currency ? { currency } : {}),
     variant_id: Number.isFinite(variantId) && variantId > 0 ? variantId : null,
-    ...(source.preferences !== undefined ? { preferences: source.preferences } : {}),
+    ...(source.preferences !== undefined || deliveryInfo || shippingKey
+      ? {
+          preferences: {
+            ...(source.preferences && typeof source.preferences === "object" ? source.preferences : {}),
+            ...(deliveryInfo ? { storefront_delivery: deliveryInfo } : {}),
+            ...(shippingKey ? { storefront_shipping_key: shippingKey } : {}),
+          },
+        }
+      : {}),
+    ...(deliveryInfo ? { delivery_info: deliveryInfo } : {}),
+    ...(shipping ? { shipping } : {}),
+    ...(shippingKey ? { shipping_key: shippingKey } : {}),
     ...(source.vendor_product_id !== undefined ? { vendor_product_id: source.vendor_product_id } : {}),
     ...(source.price_id !== undefined ? { price_id: source.price_id } : {}),
   };
-}
+  }
 
 async function fetchStorefrontProducts(url) {
   const endpoint = new URL(`${STOREFRONT_XAPI_BASE}/shops/@${STOREFRONT_SHOP_HANDLE}/products/all`);
@@ -1038,9 +1076,580 @@ async function fetchStorefrontProducts(url) {
   return requestStorefrontXapi(endpoint, "products");
 }
 
-async function fetchStorefrontProduct(productId) {
+async function fetchStorefrontProduct(productId, storefrontSession = null) {
   const endpoint = new URL(`${STOREFRONT_XAPI_BASE}/shops/@${STOREFRONT_SHOP_HANDLE}/products/${encodeURIComponent(productId)}/info`);
+  const token = await ensureStorefrontToken(storefrontSession).catch(() => null);
+  if (token) {
+    const authorizedResult = await requestStorefrontAuthorizedEndpoint(token, endpoint, { method: "GET", label: "product" });
+    if (authorizedResult.ok) {
+      return normalizeStorefrontProductInfoResult(authorizedResult.payload, endpoint, authorizedResult.status, true);
+    }
+    if (![401, 403].includes(authorizedResult.status || 0)) {
+      return {
+        ok: false,
+        source: "storefront_xapi",
+        status: authorizedResult.status || 502,
+        endpoint: authorizedResult.endpoint || publicStorefrontEndpoint(endpoint),
+        error: authorizedResult.error || "Selldone product detail request failed.",
+        payload: authorizedResult.payload,
+      };
+    }
+  }
   return requestStorefrontXapi(endpoint, "product");
+}
+
+function normalizeStorefrontProductInfoResult(payload = {}, endpoint, status = 200, authenticated = false) {
+  return {
+    ok: true,
+    source: "storefront_xapi",
+    apiBaseUrl: STOREFRONT_XAPI_BASE,
+    endpoint: publicStorefrontEndpoint(endpoint),
+    authenticated,
+    products: [],
+    folders: [],
+    total: firstNonNull(payload?.total, payload?.data?.total, payload?.result?.total, payload?.payload?.total, 0),
+    product: firstNonNull(payload?.product, payload?.data?.product, payload?.result?.product, payload?.payload?.product, null),
+    articles: [],
+    blogs: [],
+    last_articles: [],
+    popular: [],
+    categories: [],
+    interest: [],
+    transportations: [],
+    data: payload,
+    payload,
+    status,
+  };
+}
+
+async function fetchStorefrontProductReviews(productId, storefrontSession = null) {
+  const safeId = String(productId || "").trim();
+  if (!safeId) {
+    return {
+      ok: false,
+      source: "storefront_product_reviews",
+      status: 400,
+      error: "Product ID is required to load Selldone reviews.",
+    };
+  }
+
+  const token = await ensureStorefrontToken(storefrontSession).catch(() => null);
+
+  const productResult = await fetchStorefrontProduct(safeId, storefrontSession).catch(() => null);
+  const cachedProduct = productResult?.ok
+    ? firstNonNull(
+        productResult.product,
+        productResult.payload?.product,
+        productResult.data?.product,
+        productResult.result?.product,
+        productResult.payload?.data?.product,
+        productResult.payload?.result?.product,
+        productResult.payload?.payload?.product,
+        null,
+      )
+    : null;
+
+  const articleCommentsPayload = buildStorefrontArticleCommentsPayloadFromProduct(cachedProduct, productResult?.payload, safeId);
+  if (articleCommentsPayload) {
+    return articleCommentsPayload;
+  }
+
+  const candidatePaths = ["reviews", "comments"];
+  let lastFailure = null;
+
+  for (const key of candidatePaths) {
+    const endpoint = new URL(`${STOREFRONT_XAPI_BASE}/shops/@${STOREFRONT_SHOP_HANDLE}/products/${encodeURIComponent(safeId)}/${key}`);
+
+    const tokenResult = token ? await requestStorefrontAuthorizedEndpoint(token, endpoint, { method: "GET", label: "product-reviews" }) : null;
+    if (tokenResult?.ok) {
+      return normalizeStorefrontReviewsResult(tokenResult.payload, endpoint, tokenResult.status, "product_reviews");
+    }
+    if (tokenResult && ![401, 403, 404, 405].includes(tokenResult.status || 0)) {
+      return {
+        ok: false,
+        source: "storefront_product_reviews",
+        status: tokenResult.status || 502,
+        endpoint: tokenResult.endpoint || publicStorefrontEndpoint(endpoint),
+        error: tokenResult.error || "Selldone product review request failed.",
+        payload: tokenResult.payload,
+      };
+    }
+    if (tokenResult && tokenResult.status) {
+      lastFailure = {
+        status: tokenResult.status,
+        endpoint: tokenResult.endpoint,
+        error: tokenResult.error,
+        payload: tokenResult.payload,
+      };
+    }
+
+    const publicResult = await requestStorefrontXapi(endpoint, "product_reviews");
+    if (publicResult.ok) {
+      return normalizeStorefrontReviewsResult(publicResult.payload, endpoint, publicResult.status, "product_reviews");
+    }
+    if ([401, 403, 404, 405].includes(publicResult.status || 0)) {
+      lastFailure = {
+        status: publicResult.status,
+        endpoint: publicResult.endpoint,
+        error: publicResult.error,
+      };
+      continue;
+    }
+    if (![404, 405].includes(publicResult.status || 0)) {
+      return {
+        ok: false,
+        source: "storefront_product_reviews",
+        status: publicResult.status || 502,
+        endpoint: publicResult.endpoint,
+        error: publicResult.error || "Selldone product review request failed.",
+      };
+      }
+  }
+
+  const fallbackPayload = buildStorefrontReviewFallbackPayloadFromProduct(cachedProduct, safeId);
+  if (fallbackPayload) {
+    return fallbackPayload;
+  }
+
+  const status = Number.isFinite(lastFailure?.status) ? Number(lastFailure.status) : 404;
+  return {
+    ok: false,
+    source: "storefront_product_reviews",
+    status,
+    endpoint: lastFailure?.endpoint || publicStorefrontEndpoint(
+      new URL(`${STOREFRONT_XAPI_BASE}/shops/@${STOREFRONT_SHOP_HANDLE}/products/${encodeURIComponent(safeId)}/reviews`),
+    ),
+    error: lastFailure?.error || "Selldone product review endpoint is not available for this storefront.",
+    payload: lastFailure?.payload,
+  };
+}
+
+async function submitStorefrontProductReview(productId, storefrontSession, payload = {}) {
+  const safeId = String(productId || "").trim();
+  if (!safeId) {
+    return {
+      ok: false,
+      source: "storefront_product_review_submit",
+      status: 400,
+      error: "Product ID is required to submit a Selldone review.",
+    };
+  }
+
+  const token = await ensureStorefrontToken(storefrontSession);
+  if (!token) {
+    return {
+      ok: false,
+      source: "storefront_product_review_submit",
+      status: 401,
+      error: "Authentication required to post a Selldone review.",
+    };
+  }
+
+  const userRatingPayload = firstNonNull(payload?.user_rating, payload?.userRating, null);
+  const mode = String(firstNonNull(payload?.mode, payload?.review_mode, payload?.reviewMode, "") || "")
+    .trim()
+    .toLowerCase();
+  const comment = String(firstNonNull(payload?.comment, payload?.text, payload?.body, "") || "").trim();
+  const hasUserRatingPayload = Boolean(
+    userRatingPayload &&
+      typeof userRatingPayload === "object" &&
+      !Array.isArray(userRatingPayload) &&
+      Object.keys(userRatingPayload).length,
+  );
+  if ((mode === "comment" || !hasUserRatingPayload) && comment) {
+    return submitStorefrontProductCommentOnly(safeId, storefrontSession, token, comment);
+  }
+  const rating = Number.parseFloat(
+    firstNonNull(
+      typeof userRatingPayload === "object" && userRatingPayload && !Array.isArray(userRatingPayload) ? Object.values(userRatingPayload)[0] : null,
+      payload?.rating,
+      payload?.rate,
+      payload?.score,
+      0,
+    ),
+  );
+  if (!Number.isFinite(rating) || rating < 1 || rating > 5) {
+    if (comment) {
+      return submitStorefrontProductCommentOnly(safeId, storefrontSession, token, comment);
+    }
+    return {
+      ok: false,
+      source: "storefront_product_review_submit",
+      status: 422,
+      error: "A rating from 1 to 5 is required to post a product review.",
+    };
+  }
+
+  const productResult = await fetchStorefrontProduct(safeId);
+  if (!productResult.ok) {
+    return {
+      ok: false,
+      source: "storefront_product_review_submit",
+      status: productResult.status || 502,
+      endpoint: productResult.endpoint,
+      error: productResult.error || "Selldone product detail is required before submitting a product rating.",
+      payload: productResult.payload,
+    };
+  }
+
+  const product = firstNonNull(
+    productResult.product,
+    productResult.data?.product,
+    productResult.data?.data?.product,
+    productResult.data?.result?.product,
+    productResult.data?.payload?.product,
+    null,
+  );
+  const normalizedUserRating = normalizeStorefrontProductUserRating(userRatingPayload, rating, product);
+  if (!Object.keys(normalizedUserRating).length) {
+    return {
+      ok: false,
+      source: "storefront_product_review_submit",
+      status: 409,
+      endpoint: productResult.endpoint,
+      error: "This Selldone product does not expose rating criteria for storefront rating submission.",
+      payload: {
+        product_id: safeId,
+        ratings: firstArray(product?.ratings),
+      },
+    };
+  }
+
+  const body = { user_rating: normalizedUserRating };
+  if (comment) body.comment = comment;
+  const endpoint = new URL(`${STOREFRONT_XAPI_BASE}/shops/@${STOREFRONT_SHOP_HANDLE}/products/${encodeURIComponent(safeId)}/set-my-rating`);
+  const result = await requestStorefrontAuthorizedEndpoint(token, endpoint, {
+    method: "POST",
+    label: "product-review-submit",
+    body,
+  });
+  if (result.ok) {
+    return {
+      ok: true,
+      source: "storefront_product_review_submit",
+      status: result.status,
+      endpoint: result.endpoint,
+      titleFieldAccepted: false,
+      payload: result.payload,
+    };
+  }
+
+  return {
+    ok: false,
+    source: "storefront_product_review_submit",
+    status: result.status || 502,
+    endpoint: result.endpoint,
+    error: result.error || "Selldone product rating submit request failed.",
+    payload: result.payload,
+  };
+}
+
+async function submitStorefrontProductCommentOnly(productId, storefrontSession, token, comment) {
+  const safeId = String(productId || "").trim();
+  const productResult = await fetchStorefrontProduct(safeId, storefrontSession);
+  if (!productResult.ok) {
+    return {
+      ok: false,
+      source: "storefront_product_comment_submit",
+      status: productResult.status || 502,
+      endpoint: productResult.endpoint,
+      error: productResult.error || "Selldone product detail is required before submitting a product comment.",
+      payload: productResult.payload,
+    };
+  }
+
+  const product = firstNonNull(
+    productResult.product,
+    productResult.data?.product,
+    productResult.data?.data?.product,
+    productResult.data?.result?.product,
+    productResult.data?.payload?.product,
+    productResult.payload?.product,
+    productResult.payload?.data?.product,
+    null,
+  );
+  const articleId = extractStorefrontProductArticleId(product, productResult.payload);
+  if (!articleId) {
+    return {
+      ok: false,
+      source: "storefront_product_comment_submit",
+      status: 409,
+      endpoint: productResult.endpoint,
+      error: "Selldone XAPI product detail did not return a product article id for comment submission.",
+      payload: {
+        product_id: safeId,
+        article: firstNonNull(product?.article, product?.product_article, product?.article_pack?.article, product?.articlePack?.article, null),
+      },
+    };
+  }
+
+  const endpoint = new URL(`${STOREFRONT_XAPI_BASE}/article/${encodeURIComponent(articleId)}/comment`);
+  const result = await requestStorefrontAuthorizedEndpoint(token, endpoint, {
+    method: "POST",
+    label: "product-article-comment-submit",
+    body: { body: comment },
+  });
+  if (result.ok) {
+    return {
+      ok: true,
+      source: "storefront_product_comment_submit",
+      status: result.status,
+      endpoint: result.endpoint,
+      payload: result.payload,
+    };
+  }
+
+  return {
+    ok: false,
+    source: "storefront_product_comment_submit",
+    status: result.status || 502,
+    endpoint: result.endpoint,
+    error: result.error || "Selldone product article comment submit request failed.",
+    payload: result.payload,
+  };
+}
+
+function extractStorefrontProductArticleId(product = null, payload = null) {
+  const article = firstNonNull(
+    product?.article,
+    product?.product_article,
+    product?.productArticle,
+    product?.article_data,
+    product?.articleData,
+    product?.article_pack?.article,
+    product?.articlePack?.article,
+    product?.blog,
+    payload?.article,
+    payload?.product?.article,
+    payload?.data?.article,
+    payload?.data?.product?.article,
+    payload?.result?.article,
+    payload?.result?.product?.article,
+    payload?.payload?.article,
+    payload?.payload?.product?.article,
+    null,
+  );
+  return String(
+    firstNonNull(
+      product?.article_id,
+      product?.articleId,
+      product?.product_article_id,
+      product?.productArticleId,
+      article?.id,
+      article?.article_id,
+      article?.articleId,
+      payload?.article_id,
+      payload?.articleId,
+      payload?.product?.article_id,
+      payload?.product?.articleId,
+      payload?.data?.article_id,
+      payload?.data?.articleId,
+      payload?.data?.product?.article_id,
+      payload?.data?.product?.articleId,
+      payload?.result?.article_id,
+      payload?.result?.articleId,
+      payload?.result?.product?.article_id,
+      payload?.result?.product?.articleId,
+      "",
+    ) || "",
+  ).trim();
+}
+
+function normalizeStorefrontProductUserRating(userRatingPayload, rating, product = null) {
+  const requestedRatings =
+    userRatingPayload && typeof userRatingPayload === "object" && !Array.isArray(userRatingPayload)
+      ? Object.fromEntries(
+          Object.entries(userRatingPayload)
+            .map(([key, value]) => [String(key || "").trim(), Number.parseFloat(value)])
+            .filter(([key, value]) => key && Number.isFinite(value) && value >= 1 && value <= 5),
+        )
+      : {};
+  const criteria = firstArray(product?.ratings, product?.rating_items, product?.ratingItems, product?.rating_options, product?.ratingOptions);
+  const criterionIds = criteria
+    .map((entry) => String(firstNonNull(entry?.id, entry?.rating_id, entry?.ratingId, "") || "").trim())
+    .filter(Boolean);
+  const allowedIds = new Set(criterionIds);
+  const matchedRatings = Object.fromEntries(Object.entries(requestedRatings).filter(([key]) => allowedIds.has(key)));
+  if (Object.keys(matchedRatings).length) return matchedRatings;
+
+  return Object.fromEntries(criterionIds.map((criterionId) => [criterionId, rating]));
+}
+
+function buildStorefrontArticleCommentsPayloadFromProduct(product = null, payload = null, productId = "") {
+  const article = firstNonNull(
+    product?.article,
+    product?.product_article,
+    product?.productArticle,
+    product?.article_data,
+    product?.articleData,
+    product?.article_pack?.article,
+    product?.articlePack?.article,
+    product?.blog,
+    payload?.article,
+    payload?.product?.article,
+    payload?.data?.article,
+    payload?.data?.product?.article,
+    payload?.result?.article,
+    payload?.result?.product?.article,
+    payload?.payload?.article,
+    payload?.payload?.product?.article,
+    null,
+  );
+  const comments = firstStorefrontCommentArray(
+    article?.comments,
+    article?.comments?.data,
+    article?.comments?.items,
+    article?.comments?.comments,
+    article?.comments?.records,
+    article?.comments?.list,
+    article?.data?.comments,
+    article?.data?.comments?.data,
+    article?.data?.comments?.items,
+    article?.result?.comments,
+    article?.result?.comments?.data,
+    article?.result?.comments?.items,
+    article?.payload?.comments,
+    article?.payload?.comments?.data,
+    article?.payload?.comments?.items,
+    article?.comment_list,
+    article?.commentList,
+    article?.article_comments,
+    article?.articleComments,
+    payload?.comments,
+    payload?.comments?.data,
+    payload?.comments?.items,
+    payload?.data?.comments,
+    payload?.data?.comments?.data,
+    payload?.data?.comments?.items,
+    payload?.result?.comments,
+    payload?.result?.comments?.data,
+    payload?.result?.comments?.items,
+    payload?.payload?.comments,
+    payload?.payload?.comments?.data,
+    payload?.payload?.comments?.items,
+    payload?.product?.article?.comments,
+    payload?.product?.article?.comments?.data,
+    payload?.product?.article?.comments?.items,
+    payload?.data?.product?.article?.comments,
+    payload?.data?.product?.article?.comments?.data,
+    payload?.data?.product?.article?.comments?.items,
+    payload?.result?.product?.article?.comments,
+    payload?.result?.product?.article?.comments?.data,
+    payload?.result?.product?.article?.comments?.items,
+    payload?.payload?.product?.article?.comments,
+    payload?.payload?.product?.article?.comments?.data,
+    payload?.payload?.product?.article?.comments?.items,
+    [],
+  );
+  if (!comments.length) return null;
+  const articleId = extractStorefrontProductArticleId(product, payload);
+  return normalizeStorefrontReviewsResult(
+    {
+      comments,
+      review_stats: {
+        count: comments.length,
+        total: comments.length,
+        total_count: comments.length,
+      },
+    },
+    new URL(`${STOREFRONT_XAPI_BASE}/article/${encodeURIComponent(articleId || String(productId || "").trim())}/comment`),
+    200,
+    "product_article_comments",
+  );
+}
+
+function firstStorefrontCommentArray(...values) {
+  for (const value of values) {
+    if (Array.isArray(value)) return value;
+    if (value && typeof value === "object") {
+      const nested = firstArray(value.comments, value.data, value.items, value.records, value.list, value.results);
+      if (nested.length) return nested;
+    }
+  }
+  return [];
+}
+
+function buildStorefrontReviewFallbackPayloadFromProduct(product = null, productId = "") {
+  if (!product || typeof product !== "object") return null;
+  const reviewCount = parseInt(firstNonNull(product.rate_count, product.review_count, product.reviews_count, product.rateCount, 0), 10);
+  if (!Number.isFinite(reviewCount) && !Number.isFinite(Number(product.rate)) && !Number.isFinite(Number(product.rating))) {
+    return null;
+  }
+  const rating = parseFloat(firstNonNull(product.rate, product.rating, product.review_rating, 0));
+  const count = Number.isFinite(reviewCount) ? reviewCount : 0;
+  return normalizeStorefrontReviewsResult(
+    {
+      review_stats: {
+        count,
+        total: count,
+        total_count: count,
+        rating,
+        avg_rating: rating,
+        average_rating: rating,
+      },
+      reviews: [],
+    },
+    new URL(`${STOREFRONT_XAPI_BASE}/shops/@${STOREFRONT_SHOP_HANDLE}/products/${encodeURIComponent(String(productId || "").trim())}/reviews`),
+    200,
+    "product_reviews",
+  );
+}
+
+function normalizeStorefrontReviewsResult(payload = {}, endpoint, status = 200, source = "product_reviews") {
+  const reviews = firstArray(
+    payload?.reviews,
+    payload?.data?.reviews,
+    payload?.result?.reviews,
+    payload?.payload?.reviews,
+    payload?.data?.comments,
+    payload?.result?.comments,
+    payload?.payload?.comments,
+    payload?.comments,
+    payload?.items,
+    payload?.result?.items,
+    payload?.payload?.items,
+    [],
+  );
+  const summary = firstNonNull(
+    payload?.review_stats,
+    payload?.reviewStats,
+    payload?.stats,
+    payload?.summary,
+    payload?.data?.review_stats,
+    payload?.data?.reviewStats,
+    payload?.data?.stats,
+    payload?.data?.summary,
+    payload?.payload?.review_stats,
+    payload?.payload?.reviewStats,
+    payload?.payload?.stats,
+    payload?.payload?.summary,
+    null,
+  );
+
+  const count = Number.parseInt(
+    firstNonNull(
+      summary?.count,
+      summary?.total,
+      summary?.total_count,
+      payload?.count,
+      payload?.total,
+      reviews.length,
+      0,
+    ),
+    10,
+  );
+
+  return {
+    ok: true,
+    source: `storefront_${source}`,
+    status,
+    endpoint: publicStorefrontEndpoint(endpoint),
+    reviews,
+    review_stats: summary,
+    reviewStats: summary,
+    count,
+    payload,
+  };
 }
 
 async function fetchStorefrontOrderHistory(session, url) {
@@ -1640,6 +2249,11 @@ function publicStorefrontEndpoint(endpoint, method = "GET") {
 
 function storefrontProductIdFromApiPath(pathname) {
   const match = pathname.match(/^\/api\/storefront\/products\/([^/]+)$/);
+  return match ? decodeURIComponent(match[1]) : null;
+}
+
+function storefrontProductReviewsFromApiPath(pathname) {
+  const match = pathname.match(/^\/api\/storefront\/products\/([^/]+)\/reviews$/);
   return match ? decodeURIComponent(match[1]) : null;
 }
 

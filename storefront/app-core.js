@@ -1,6 +1,6 @@
 import { selldoneImagePathToUrl } from "/dashboard/features/selldone-images.js?v=storefront-cart-image-20260614b";
 import { renderHomePage as renderHomePageModule } from "./home-page.js?v=storefront-product-article-wide-20260621";
-import { renderProductPage as renderProductPageModule } from "./product-page.js?v=storefront-product-article-wide-20260621";
+import { renderProductPage as renderProductPageModule } from "./product-page.js?v=storefront-my-rating-prefill-aliases-20260621";
 import { renderUserMenu } from "./user-menu.js?v=storefront-product-article-wide-20260621";
 import { renderAccountProfileOverviewPage } from "./account-profile.js?v=storefront-product-article-wide-20260621";
 import { renderOrderHistoryPage } from "./order-history.js?v=storefront-product-article-wide-20260621";
@@ -17,6 +17,9 @@ const DATA_SOURCE = {
   xapi: "xapi",
 };
 const XAPI_PRODUCT_LIMIT = 200;
+const XAPI_PRODUCT_DETAIL_LIMIT = 500;
+const XAPI_PRODUCT_DETAIL_RETRY = 3;
+const XAPI_PRODUCT_DETAIL_RETRY_DELAY_MS = 450;
 const BLOG_LIMIT = 24;
 
 const heroSlides = [
@@ -120,6 +123,8 @@ const state = {
   sessionAuthenticated: false,
   sessionLoginUrl: "/auth/storefront/start",
   sessionUser: {},
+  productPurchaseStatus: {},
+  productPurchaseStatusLoading: {},
   accountMenuOpen: false,
   categoryMenuOpen: false,
   pageLoading: false,
@@ -568,6 +573,108 @@ function normalizeProductPros(rawPros, product = {}) {
   return generateProductPros(product);
 }
 
+function normalizeSpecLabel(value = "") {
+  return titleCase(
+    String(value || "")
+      .replace(/[_-]+/g, " ")
+      .replace(/\s+/g, " ")
+      .trim(),
+  );
+}
+
+function normalizeSpecValue(value) {
+  if (value === null || value === undefined || value === "") return "";
+  if (typeof value === "boolean") return value ? "Yes" : "No";
+  if (typeof value === "number") return Number.isFinite(value) ? String(value) : "";
+  if (typeof value === "string") return value.trim();
+  if (Array.isArray(value)) return value.map((entry) => normalizeSpecValue(entry)).filter(Boolean).join(", ");
+  if (typeof value === "object") {
+    const direct = firstNonNull(value.value, value.val, value.text, value.name_value, value.label_value, value.title_value, null);
+    if (direct !== null && direct !== undefined) return normalizeSpecValue(direct);
+    return Object.entries(value)
+      .map(([key, entryValue]) => {
+        const normalized = normalizeSpecValue(entryValue);
+        return normalized ? `${normalizeSpecLabel(key)}: ${normalized}` : "";
+      })
+      .filter(Boolean)
+      .join(", ");
+  }
+  return String(value).trim();
+}
+
+function normalizeProductSpecEntries(source) {
+  if (!source) return [];
+  if (typeof source === "string") {
+    const value = source.trim();
+    return value ? [{ label: "Specifications", value }] : [];
+  }
+  if (Array.isArray(source)) {
+    return source
+      .flatMap((entry) => {
+        if (!entry) return [];
+        if (typeof entry !== "object") return normalizeProductSpecEntries(String(entry));
+        const label = normalizeSpecLabel(firstNonNull(entry.label, entry.title, entry.name, entry.key, entry.type, entry.attribute, entry.property, ""));
+        const value = normalizeSpecValue(firstNonNull(entry.value, entry.val, entry.text, entry.body, entry.description, entry.content, ""));
+        return label && value ? [{ label, value }] : [];
+      })
+      .filter(Boolean);
+  }
+  if (typeof source === "object") {
+    return Object.entries(source)
+      .map(([key, value]) => ({
+        label: normalizeSpecLabel(key),
+        value: normalizeSpecValue(value),
+      }))
+      .filter((entry) => entry.label && entry.value);
+  }
+  return [];
+}
+
+function mergeProductSpecEntries(entries = []) {
+  const seen = new Set();
+  return entries.filter((entry) => {
+    const label = normalizeSpecLabel(entry?.label);
+    const value = normalizeSpecValue(entry?.value);
+    if (!label || !value) return false;
+    const key = label.toLowerCase();
+    if (seen.has(key)) return false;
+    seen.add(key);
+    entry.label = label;
+    entry.value = value;
+    return true;
+  });
+}
+
+function collectProductSpecs(raw = {}, fallback = {}) {
+  const sources = [
+    raw.specs,
+    raw.spec,
+    raw.specifications,
+    raw.specification,
+    raw.properties,
+    raw.property,
+    raw.attributes,
+    raw.attribute,
+    raw.parameters,
+    raw.params,
+    raw.data?.specs,
+    raw.data?.specifications,
+    raw.payload?.specs,
+    raw.payload?.specifications,
+    raw.product?.specs,
+    raw.product?.specifications,
+  ];
+  const dynamicSpecs = sources.flatMap((source) => normalizeProductSpecEntries(source));
+  const fallbackSpecs = [
+    { label: "Brand", value: fallback.brand },
+    { label: "SKU", value: fallback.sku },
+    { label: "Product Type", value: fallback.type },
+    { label: "Category", value: fallback.category ? titleCase(fallback.category) : "" },
+    { label: "Subcategory", value: fallback.subcategory ? titleCase(fallback.subcategory) : "" },
+  ];
+  return mergeProductSpecEntries([...dynamicSpecs, ...fallbackSpecs]);
+}
+
 function generateProductPros(product = {}) {
   const seed = productProsSeed(product);
   const title = String(product.title || "This product").trim();
@@ -642,7 +749,13 @@ function generateProductPros(product = {}) {
 function renderProductProsAccordion(item = {}, description = "") {
   const pros = normalizeProductPros(item.pros, { ...item, description });
   const withSummary = pros.length ? pros : generateProductPros(item);
-  return withSummary.map((entry, index) => accordionItem(entry.title, entry.body, index === 0)).join("");
+  const specMarkup = renderProductSpecsAccordionItem(item);
+  const items = withSummary.map((entry, index) => accordionItem(entry.title, entry.body, index === 0));
+  if (!specMarkup) return items.join("");
+  const detailIndex = withSummary.findIndex((entry) => String(entry?.title || "").trim().toLowerCase() === "details");
+  const insertAt = detailIndex >= 0 ? detailIndex + 1 : 1;
+  items.splice(insertAt, 0, specMarkup);
+  return items.join("");
 }
 
 function mapProduct(raw) {
@@ -673,6 +786,12 @@ function mapProduct(raw) {
           : [],
     raw,
   );
+  const ratingCriteria = normalizeProductRatingCriteria(
+    firstArray(raw.ratings, raw.rating_criteria, raw.ratingCriteria, raw.product_ratings, raw.productRatings),
+  );
+  const myRating = normalizeProductMyRating(raw, ratingCriteria);
+  const canRateProduct = productCanRateFromPayload(raw);
+  const hasPurchasedProduct = productPurchasedFromPayload(raw);
   const price = toNumber(firstNonNull(raw.price, raw.final_price, raw.sale_price, raw.priced_value, raw.list_price), 0);
   const originalCandidate = firstNonNull(raw.original, raw.regular_price, raw.compare_at_price, raw.base_price, raw.list_price);
   const discount = toNumber(raw.discount, 0);
@@ -718,6 +837,13 @@ function mapProduct(raw) {
     reviews,
     sku: raw.sku || `PJ-${raw.id || ""}`,
     type: firstNonNull(raw.type, raw.product_type, raw.kind, ""),
+    specs: collectProductSpecs(raw, {
+      brand,
+      sku: raw.sku || `PJ-${raw.id || ""}`,
+      type: firstNonNull(raw.type, raw.product_type, raw.kind, ""),
+      category: categoryValue,
+      subcategory: subcategoryValue,
+    }),
     files: Array.isArray(raw.files) ? raw.files : [],
     file: raw.file,
     includes: Array.isArray(raw.includes) ? raw.includes : [],
@@ -831,8 +957,267 @@ function mapProduct(raw) {
     categories: Array.isArray(raw.categories) ? raw.categories : [],
     productVariants: catalogVariants.length ? catalogVariants : Array.isArray(raw.productVariants) ? raw.productVariants : [],
     variants: mappedVariants,
+    ratingCriteria,
+    ratings: ratingCriteria,
+    canRateProduct,
+    hasPurchasedProduct,
+    myRating,
+    myReview: firstNonNull(raw.my_review, raw.myReview, raw.user_review, raw.userReview, raw.my_comment, raw.myComment, raw.my_feedback, raw.myFeedback, null),
     folder: categorySource,
   };
+}
+
+function productPurchasedFromPayload(raw = {}) {
+  const purchased = firstNonNull(
+    raw.purchased,
+    raw.has_purchased,
+    raw.hasPurchased,
+    raw.bought,
+    raw.has_bought,
+    raw.hasBought,
+    raw.is_buyer,
+    raw.isBuyer,
+    raw.buyer,
+    raw.ordered,
+    raw.has_order,
+    raw.hasOrder,
+    raw.user_purchased,
+    raw.userPurchased,
+    raw.customer_purchased,
+    raw.customerPurchased,
+    raw.my_purchase,
+    raw.myPurchase,
+    raw.purchase,
+    raw.purchase_status,
+    raw.purchaseStatus,
+    raw.my_order,
+    raw.myOrder,
+    raw.order,
+    raw.user_order,
+    raw.userOrder,
+    null,
+  );
+  return purchased !== null && purchased !== undefined ? storefrontBooleanFlag(purchased) : false;
+}
+
+function productCanRateFromPayload(raw = {}) {
+  const explicit = firstNonNull(
+    raw.can_rate,
+    raw.canRate,
+    raw.can_rate_product,
+    raw.canRateProduct,
+    raw.can_review,
+    raw.canReview,
+    raw.can_comment_rate,
+    raw.canCommentRate,
+    null,
+  );
+  if (explicit !== null && explicit !== undefined) return storefrontBooleanFlag(explicit);
+
+  const purchased = firstNonNull(
+    raw.purchased,
+    raw.has_purchased,
+    raw.hasPurchased,
+    raw.bought,
+    raw.has_bought,
+    raw.hasBought,
+    raw.is_buyer,
+    raw.isBuyer,
+    raw.buyer,
+    raw.ordered,
+    raw.has_order,
+    raw.hasOrder,
+    null,
+  );
+  if (purchased !== null && purchased !== undefined) return storefrontBooleanFlag(purchased);
+
+  const myRating = firstNonNull(raw.my_rating, raw.myRating, raw.user_rating, raw.userRating, raw.rating_by_me, raw.ratingByMe, null);
+  return Boolean(myRating && typeof myRating === "object" ? Object.keys(myRating).length : myRating);
+}
+
+function storefrontBooleanFlag(value) {
+  if (typeof value === "boolean") return value;
+  if (typeof value === "number") return value > 0;
+  if (typeof value === "string") {
+    const normalized = value.trim().toLowerCase();
+    if (["1", "true", "yes", "y", "buyer", "purchased", "bought"].includes(normalized)) return true;
+    if (["0", "false", "no", "n", "null", "none"].includes(normalized)) return false;
+  }
+  return Boolean(value);
+}
+
+function normalizeProductMyRating(raw = {}, ratingCriteria = []) {
+  const source = firstNonNull(
+    raw.my_rating,
+    raw.myRating,
+    raw.user_rating,
+    raw.userRating,
+    raw.rating_by_me,
+    raw.ratingByMe,
+    raw.my_rate,
+    raw.myRate,
+    raw.user_rate,
+    raw.userRate,
+    raw.customer_rating,
+    raw.customerRating,
+    raw.customer_rate,
+    raw.customerRate,
+    raw.viewer_rating,
+    raw.viewerRating,
+    raw.viewer_rate,
+    raw.viewerRate,
+    null,
+  );
+  if (!source) return null;
+
+  const aliases = new Map();
+  const addAlias = (alias, id) => {
+    const safeAlias = String(alias || "").trim();
+    const safeId = String(id || "").trim();
+    if (safeAlias && safeId) aliases.set(safeAlias, safeId);
+  };
+  ratingCriteria.forEach((criterion, index) => {
+    const id = String(firstNonNull(criterion?.id, criterion?.rating_id, criterion?.ratingId, criterion?.key, criterion?.name, index + 1) || "").trim();
+    if (!id) return;
+    [
+      id,
+      criterion?.name,
+      criterion?.title,
+      criterion?.label,
+      criterion?.key,
+      criterion?.slug,
+      criterion?.code,
+      criterion?.rating_id,
+      criterion?.ratingId,
+      criterion?.rate_id,
+      criterion?.rateId,
+      criterion?.product_rating_id,
+      criterion?.productRatingId,
+      index + 1,
+    ].forEach((alias) => addAlias(alias, id));
+  });
+
+  const normalized = {};
+  const assign = (key, value) => {
+    const objectKey =
+      value && typeof value === "object"
+        ? firstNonNull(
+            value.id,
+            value.rating_id,
+            value.ratingId,
+            value.rate_id,
+            value.rateId,
+            value.product_rating_id,
+            value.productRatingId,
+            value.key,
+            value.slug,
+            value.code,
+            value.name,
+            value.title,
+            value.label,
+            null,
+          )
+        : null;
+    const rawKey = String(firstNonNull(objectKey, key, "") || "").trim();
+    const resolvedKey = aliases.get(rawKey) || rawKey;
+    const rawValue = value && typeof value === "object" ? firstNonNull(value.value, value.rate, value.rating, value.score, value.point, value.points, value.stars, 0) : value;
+    const numeric = Number(rawValue);
+    if (!resolvedKey || !Number.isFinite(numeric) || numeric < 1 || numeric > 5) return;
+    normalized[resolvedKey] = Math.max(1, Math.min(5, Math.round(numeric)));
+  };
+
+  const walk = (value, fallbackKey = "") => {
+    if (!value) return;
+    if (Array.isArray(value)) {
+      value.forEach((entry, index) => walk(entry, String(index + 1)));
+      return;
+    }
+    if (typeof value === "object") {
+      const directKey = firstNonNull(
+        value.id,
+        value.rating_id,
+        value.ratingId,
+        value.rate_id,
+        value.rateId,
+        value.product_rating_id,
+        value.productRatingId,
+        value.key,
+        value.slug,
+        value.code,
+        value.name,
+        value.title,
+        value.label,
+        fallbackKey,
+      );
+      const directValue = firstNonNull(value.value, value.rate, value.rating, value.score, value.point, value.points, value.stars, null);
+      if (directValue !== null && directValue !== undefined) assign(directKey, directValue);
+      const nested = firstNonNull(
+        value.user_rating,
+        value.userRating,
+        value.my_rating,
+        value.myRating,
+        value.rating_values,
+        value.ratingValues,
+        value.rating_items,
+        value.ratingItems,
+        value.ratings,
+        value.rates,
+        value.items,
+        value.values,
+        value.criteria,
+        null,
+      );
+      if (nested) walk(nested, fallbackKey);
+      if (directValue === null || directValue === undefined) {
+        Object.entries(value).forEach(([key, entry]) => {
+          if (
+            [
+              "user_rating",
+              "userRating",
+              "my_rating",
+              "myRating",
+              "rating_values",
+              "ratingValues",
+              "rating_items",
+              "ratingItems",
+              "ratings",
+              "rates",
+              "items",
+              "values",
+              "criteria",
+            ].includes(key)
+          )
+            return;
+          assign(key, entry);
+        });
+      }
+      return;
+    }
+    assign(fallbackKey, value);
+  };
+
+  walk(source);
+  return Object.keys(normalized).length ? normalized : source;
+}
+
+function normalizeProductRatingCriteria(rawRatings = []) {
+  return (Array.isArray(rawRatings) ? rawRatings : [])
+    .map((entry, index) => {
+      if (!entry || typeof entry !== "object") return null;
+      const id = String(firstNonNull(entry.id, entry.rating_id, entry.ratingId, entry.key, index + 1) || "").trim();
+      const name = String(firstNonNull(entry.name, entry.title, entry.label, `Rating ${index + 1}`) || `Rating ${index + 1}`).trim();
+      const value = toNumber(firstNonNull(entry.value, entry.total, 0), 0);
+      const count = toNumber(firstNonNull(entry.count, entry.total_count, entry.totalCount, 0), 0);
+      const average = count > 0 ? Math.max(0, Math.min(5, value / count)) : toNumber(firstNonNull(entry.average, entry.rate, entry.rating, 0), 0);
+      return {
+        id,
+        name,
+        value,
+        count,
+        average: Math.max(0, Math.min(5, average)),
+      };
+    })
+    .filter((entry) => entry?.id && entry?.name);
 }
 
 function normalizeProductVariants(rawVariants = [], rawProduct = null) {
@@ -2039,6 +2424,48 @@ function calculateTransportCost(transport, orderSubtotal = 0) {
   return Math.max(0, deliveryCost(transport, orderSubtotal));
 }
 
+function cartDeliveryPayloadFromTransport(transport = null, key = "") {
+  if (!transport || typeof transport !== "object") return null;
+  const shippingKey = String(key || transportSelectionKey(transport, "shipping-default") || "").trim();
+  const type = transportTypeValue(transport) || String(firstNonNull(transport.type, transport.code, shippingKey, "standard"));
+  const cost = calculateTransportCost(transport);
+  return {
+    key: shippingKey,
+    shipping_key: shippingKey,
+    delivery_type: type,
+    type,
+    transportation_id: firstNonNull(transport.id, transport.transportation_id, transport.option_id, null),
+    name: firstNonNull(transport.name, transport.title, transportTitle(transport)),
+    title: transportTitle(transport),
+    cost,
+    price: cost,
+    currency: String(firstNonNull(transport.currency, "USD")),
+    sod: type === "pickup" ? false : transport.sod,
+    const: type === "pickup" ? 10 : transport.const,
+  };
+}
+
+function cartDeliveryPayloadFromKey(key = "") {
+  const shippingKey = String(key || "").trim();
+  if (!shippingKey) return null;
+  const type = shippingKey.replace(/-default$/, "").split("-")[0] || "shipping";
+  const cost = type === "pickup" ? 10 : 0;
+  return {
+    key: shippingKey,
+    shipping_key: shippingKey,
+    delivery_type: type,
+    type,
+    transportation_id: null,
+    name: type === "pickup" ? "Pickup" : type === "motorbike" ? "Same Day" : "Shipping",
+    title: type === "pickup" ? "Pickup" : type === "motorbike" ? "Same Day" : "Shipping",
+    cost,
+    price: cost,
+    currency: "USD",
+    sod: type === "pickup" ? false : undefined,
+    const: type === "pickup" ? 10 : undefined,
+  };
+}
+
 function transportSelectionKey(transport, fallback = "shipping") {
   if (!transport || typeof transport !== "object") return "";
   return firstNonNull(
@@ -2170,48 +2597,338 @@ async function fetchXapiProductsViaProxy() {
   return payload;
 }
 
+async function fetchXapiProductsViaProxyWithLimit(limit = XAPI_PRODUCT_LIMIT) {
+  const safeLimit = Math.max(1, Number.isFinite(Number(limit)) ? Number(limit) : XAPI_PRODUCT_LIMIT);
+  const response = await fetch(`/api/storefront/products?limit=${Math.min(1500, Math.floor(safeLimit))}`, {
+    headers: { Accept: "application/json" },
+  });
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok || payload.ok === false) {
+    throw new Error(payload.error || `Local Selldone XAPI proxy failed with status ${response.status}.`);
+  }
+  return payload;
+}
+
 async function fetchXapiProducts() {
   const payload = await fetchXapiProductsViaProxy();
   return applyXapiCatalog(payload, "proxy");
 }
 
+async function hydrateProductFromCatalog(productId) {
+  try {
+    const payload = await fetchXapiProductsViaProxyWithLimit(XAPI_PRODUCT_DETAIL_LIMIT);
+    applyXapiCatalog(payload, "proxy-fallback");
+    return getProductById(productId);
+  } catch (error) {
+    console.warn("Selldone XAPI catalog fallback failed for product detail:", error);
+    return null;
+  }
+}
+
 async function fetchXapiProductDetail(productId) {
   if (!productId) return null;
+  const safeId = String(productId).trim();
+  const encodedId = encodeURIComponent(safeId);
+  let lastError = null;
 
+  for (let attempt = 1; attempt <= XAPI_PRODUCT_DETAIL_RETRY; attempt += 1) {
+    try {
+      const proxyResponse = await fetch(`/api/storefront/products/${encodedId}`, {
+        headers: { Accept: "application/json" },
+      }).catch(() => null);
+      if (!proxyResponse?.ok) {
+        const details = proxyResponse && typeof proxyResponse.json === "function" ? await proxyResponse.json().catch(() => ({})) : {};
+        throw new Error(details?.error || details?.message || `Selldone proxy product detail failed with status ${proxyResponse?.status || "unknown"}.`);
+      }
+      const response = await proxyResponse.json().catch(() => null);
+      if (!response) throw new Error("Selldone product detail response was empty.");
+      const payload = firstNonNull(
+        response?.product,
+        response?.data?.product,
+        response?.data?.response?.product,
+        response?.response?.product,
+        response?.result?.product,
+        response?.result?.response?.product,
+        response?.payload?.product,
+        response?.payload?.response?.product,
+        response?.payload?.data?.product,
+        response?.data,
+        response,
+      );
+      const mapped = mapProduct(payload);
+      if (!mapped) throw new Error("Selldone product payload could not be mapped.");
+      const reviewData = await fetchXapiProductReviews(mapped.id).catch(() => null);
+      if (reviewData) {
+        applyProductReviewPayloadToProduct(mapped, reviewData);
+      }
+      mapped.reviewsLoaded = true;
+
+      const nextProducts = [...state.products];
+      const index = nextProducts.findIndex((entry) => String(entry.id) === String(mapped.id));
+      if (index >= 0) nextProducts[index] = mapped;
+      else nextProducts.unshift(mapped);
+      state.products = nextProducts;
+      return mapped;
+    } catch (error) {
+      lastError = error;
+      if (attempt < XAPI_PRODUCT_DETAIL_RETRY) {
+        await new Promise((resolve) => window.setTimeout(resolve, XAPI_PRODUCT_DETAIL_RETRY_DELAY_MS));
+      }
+    }
+  }
+
+  console.warn("Selldone XAPI product detail fetch failed after retries:", lastError);
+
+  const fallbackFromCatalog = await hydrateProductFromCatalog(safeId);
+  return fallbackFromCatalog || getProductById(safeId) || null;
+}
+
+function parseStorefrontReviewCount(value, fallback = 0) {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : fallback;
+}
+
+function normalizeStorefrontReviewRatings(value = null) {
+  if (!value) return [];
+  const entries = Array.isArray(value)
+    ? value
+    : typeof value === "object"
+      ? Object.entries(value).map(([key, entry]) =>
+          entry && typeof entry === "object"
+            ? {
+                id: firstNonNull(entry.id, entry.rating_id, entry.ratingId, key),
+                name: firstNonNull(entry.name, entry.title, entry.label, key),
+                value: firstNonNull(entry.value, entry.rate, entry.rating, entry.score, entry.point, entry.points, 0),
+              }
+            : {
+                id: key,
+                name: key,
+                value: entry,
+              },
+        )
+      : [];
+  return entries
+    .map((entry, index) => {
+      if (!entry || typeof entry !== "object") return null;
+      const value = Math.max(
+        0,
+        Math.min(5, Math.round(parseStorefrontReviewCount(firstNonNull(entry.value, entry.rate, entry.rating, entry.score, entry.point, entry.points, 0), 0))),
+      );
+      if (!value) return null;
+      const id = String(firstNonNull(entry.id, entry.rating_id, entry.ratingId, entry.key, entry.name, index + 1) || "").trim();
+      return {
+        id,
+        name: String(firstNonNull(entry.name, entry.title, entry.label, id || `Rating ${index + 1}`) || "").trim(),
+        value,
+      };
+    })
+    .filter(Boolean);
+}
+
+function normalizeStorefrontReviewEntry(entry = {}) {
+  if (!entry || typeof entry !== "object") return null;
+  const rating = Math.max(0, Math.min(5, Math.round(parseStorefrontReviewCount(entry.rating, entry.rate))));
+  const rawName = firstNonNull(
+    entry.name,
+    entry.author_name,
+    entry.user_name,
+    entry.reviewer_name,
+    entry.profile?.name,
+    entry.profile?.full_name,
+    entry.profile?.display_name,
+    entry.user?.name,
+    entry.user?.full_name,
+    entry.user?.display_name,
+    entry.reviewer?.name,
+    entry.reviewer?.full_name,
+    entry.reviewer?.display_name,
+    null,
+  );
+  const text = firstNonNull(entry.comment, entry.text, entry.body, entry.message, entry.title, null);
+  const created = firstNonNull(entry.created_at, entry.createdAt, entry.date, entry.created_date, null);
+  const userId = firstNonNull(entry.user_id, entry.userId, entry.author_id, entry.reviewer_id, entry.profile?.id, entry.user?.id, entry.reviewer?.id, null);
+  const avatarUrl = firstNonNull(
+    entry.avatarUrl,
+    entry.avatar_url,
+    entry.avatar,
+    entry.image,
+    entry.photo,
+    entry.user?.avatarUrl,
+    entry.user?.avatar_url,
+    entry.user?.avatar,
+    entry.user?.image,
+    entry.user?.photo,
+    entry.profile?.avatarUrl,
+    entry.profile?.avatar_url,
+    entry.profile?.avatar,
+    entry.profile?.image,
+    entry.profile?.photo,
+    userId ? storefrontUserAvatarUrl(userId, "small") : "",
+    "",
+  );
+  return {
+    id: String(firstNonNull(entry.id, entry.review_id, entry.comment_id, "") || "").trim(),
+    name: String(firstNonNull(rawName, "Customer")).trim(),
+    title: String(firstNonNull(entry.title, "")).trim(),
+    comment: String(firstNonNull(text, "")).trim(),
+    rating,
+    ratings: normalizeStorefrontReviewRatings(firstNonNull(entry.user_rating, entry.userRating, entry.ratings, entry.rates, entry.rating_items, entry.ratingItems, entry.rating_criteria, entry.ratingCriteria, null)),
+    avatarUrl: String(avatarUrl || "").trim(),
+    userId,
+    createdAt: created ? String(created) : "",
+    verified: Boolean(
+      firstNonNull(
+        entry.verified,
+        entry.verified_purchase,
+        entry.verifiedPurchase,
+        entry.verified_buyer,
+        entry.verifiedBuyer,
+        entry.is_verified,
+        entry.isVerified,
+        entry.purchased,
+        entry.has_purchased,
+        entry.hasPurchased,
+        false,
+      ),
+    ),
+    isMine: Boolean(firstNonNull(entry.isMine, entry.is_mine, entry.mine, entry.my, entry.own, entry.is_own, entry.isOwn, entry.my_review, entry.myReview, false)),
+  };
+}
+
+function parseStorefrontReviewBuckets(payload = {}) {
+  const raw = firstNonNull(
+    payload?.distribution,
+    payload?.ratings_distribution,
+    payload?.rating_distribution,
+    payload?.histogram,
+    payload?.buckets,
+    null,
+  );
+  const source = raw && typeof raw === "object" ? raw : {};
+  return {
+    5: parseStorefrontReviewCount(firstNonNull(source[5], source["5"], source.star_5, source.rate_5, source.rating_5), 0),
+    4: parseStorefrontReviewCount(firstNonNull(source[4], source["4"], source.star_4, source.rate_4, source.rating_4), 0),
+    3: parseStorefrontReviewCount(firstNonNull(source[3], source["3"], source.star_3, source.rate_3, source.rating_3), 0),
+    2: parseStorefrontReviewCount(firstNonNull(source[2], source["2"], source.star_2, source.rate_2, source.rating_2), 0),
+    1: parseStorefrontReviewCount(firstNonNull(source[1], source["1"], source.star_1, source.rate_1, source.rating_1), 0),
+  };
+}
+
+function normalizeStorefrontReviewSummary(payload = {}) {
+  const summary = firstNonNull(
+    payload?.review_stats,
+    payload?.reviewStats,
+    payload?.stats,
+    payload?.summary,
+    payload?.rating,
+    {},
+  );
+  const list = firstArray(
+    payload?.reviews,
+    payload?.data?.reviews,
+    payload?.result?.reviews,
+    payload?.payload?.reviews,
+    payload?.comments,
+    payload?.data?.comments,
+    payload?.items,
+    payload?.result?.items,
+    payload?.payload?.items,
+    [],
+  );
+  return {
+    count: parseStorefrontReviewCount(firstNonNull(summary.count, summary.total, summary.total_count), 0),
+    average: parseStorefrontReviewCount(firstNonNull(summary.rating, summary.avg_rating, summary.average_rating, summary.rate, 0), 0),
+    recommendPercent: parseStorefrontReviewCount(firstNonNull(summary.recommend_percent, summary.recommendation_percent), 0),
+    buckets: parseStorefrontReviewBuckets(summary),
+    listLength: Array.isArray(list) ? list.length : 0,
+    source: summary,
+  };
+}
+
+function reviewSummaryFromProductForFallback(productId = "") {
+  const cached = getProductById(productId);
+  if (!cached || typeof cached !== "object") return null;
+
+  const reviewCount = parseStorefrontReviewCount(firstNonNull(cached.rate_count, cached.review_count, cached.reviews_count, 0), 0);
+  const reviewRating = parseStorefrontReviewCount(firstNonNull(cached.rate, cached.rating, cached.review_rating, 0), 0);
+  const recommend = firstNonNull(cached.recommendation, cached.recommend, cached.recommend_percent, null);
+  const recommendPercent = parseStorefrontReviewCount(recommend, 0);
+
+  return {
+    reviewsList: [],
+    reviewSummary: {
+      count: reviewCount,
+      average: reviewRating,
+      recommendPercent: recommendPercent > 0 ? Math.min(100, Math.max(0, recommendPercent)) : 0,
+      buckets: {
+        5: 0,
+        4: 0,
+        3: 0,
+        2: 0,
+        1: 0,
+      },
+      listLength: 0,
+      source: { fallback: true },
+    },
+    reviewCount,
+    reviewRating: reviewRating > 0 ? reviewRating : null,
+  };
+}
+
+function applyProductReviewPayloadToProduct(product = null, reviewData = null) {
+  if (!product || typeof product !== "object") return null;
+  if (!reviewData || typeof reviewData !== "object") return product;
+  if (Array.isArray(reviewData.reviewsList)) {
+    product.reviewsList = reviewData.reviewsList;
+  }
+  if (reviewData.reviewSummary && typeof reviewData.reviewSummary === "object") {
+    product.reviewSummary = reviewData.reviewSummary;
+  }
+  if (reviewData.reviewCount !== null && Number.isFinite(Number(reviewData.reviewCount))) {
+    product.reviews = Number(reviewData.reviewCount);
+  }
+  if (reviewData.reviewRating !== null && Number.isFinite(Number(reviewData.reviewRating))) {
+    product.rating = Number(reviewData.reviewRating);
+  }
+  product.reviewsLoaded = true;
+  return product;
+}
+
+async function fetchXapiProductReviews(productId) {
+  const safeId = String(productId || "").trim();
+  if (!safeId) return null;
   try {
-    const proxyResponse = await fetch(`/api/storefront/products/${encodeURIComponent(String(productId))}`, {
+    const response = await fetch(`/api/storefront/products/${encodeURIComponent(safeId)}/reviews`, {
       headers: { Accept: "application/json" },
     }).catch(() => null);
-    if (!proxyResponse?.ok) {
-      const details = await proxyResponse?.json().catch(() => ({}));
-      throw new Error(details?.error || details?.message || `Selldone proxy product detail failed with status ${proxyResponse?.status || "unknown"}.`);
-    }
-    const response = await proxyResponse.json().catch(() => null);
     if (!response) return null;
-    const payload = firstNonNull(
-      response?.product,
-      response?.data?.product,
-      response?.data?.response?.product,
-      response?.response?.product,
-      response?.result?.product,
-      response?.result?.response?.product,
-      response?.payload?.product,
-      response?.payload?.response?.product,
-      response?.payload?.data?.product,
-      response?.data,
-      response,
-    );
-    const mapped = mapProduct(payload);
-    if (!mapped) return null;
 
-    const nextProducts = [...state.products];
-    const index = nextProducts.findIndex((entry) => String(entry.id) === String(mapped.id));
-    if (index >= 0) nextProducts[index] = mapped;
-    else nextProducts.unshift(mapped);
-    state.products = nextProducts;
-    return mapped;
-  } catch (error) {
-    console.warn("Selldone XAPI product detail fetch failed:", error);
+    if (response.status === 404) {
+      return reviewSummaryFromProductForFallback(safeId) || null;
+    }
+
+    const payload = await response.json().catch(() => ({}));
+    if (!response.ok || payload?.ok === false) return null;
+    const reviewPayload = firstNonNull(payload?.reviews, payload?.data?.reviews, payload?.result?.reviews, payload?.payload?.reviews, payload);
+    const reviewSummary = normalizeStorefrontReviewSummary(payload);
+    const reviews = firstArray(
+      reviewPayload,
+      payload?.reviews,
+      payload?.data?.reviews,
+      payload?.result?.reviews,
+      payload?.payload?.reviews,
+      payload?.comments,
+      [],
+    );
+    const normalizedReviews = reviews.map((entry) => normalizeStorefrontReviewEntry(entry)).filter(Boolean);
+
+    return {
+      reviewsList: normalizedReviews,
+      reviewSummary,
+      reviewCount: Math.max(reviewSummary.count, normalizedReviews.length),
+      reviewRating: reviewSummary.average > 0 ? reviewSummary.average : null,
+    };
+  } catch {
     return null;
   }
 }
@@ -2353,6 +3070,8 @@ async function fetchSessionStatus(force = false) {
     if (!response.ok || payload?.authenticated === undefined) {
       state.sessionAuthenticated = false;
       state.sessionUser = {};
+      state.productPurchaseStatus = {};
+      state.productPurchaseStatusLoading = {};
       clearStorefrontSessionTokens();
       state.accountMenuOpen = false;
       clearStorefrontCartState({ loaded: true });
@@ -2364,6 +3083,8 @@ async function fetchSessionStatus(force = false) {
       if (!state.sessionAuthenticated) {
         clearStorefrontSessionTokens();
         state.sessionUser = {};
+        state.productPurchaseStatus = {};
+        state.productPurchaseStatusLoading = {};
         state.accountMenuOpen = false;
         clearStorefrontCartState({ loaded: true });
       }
@@ -2376,6 +3097,8 @@ async function fetchSessionStatus(force = false) {
     state.sessionLoaded = true;
     state.sessionAuthenticated = false;
     state.sessionUser = {};
+    state.productPurchaseStatus = {};
+    state.productPurchaseStatusLoading = {};
     clearStorefrontSessionTokens();
     state.accountMenuOpen = false;
     return false;
@@ -2409,9 +3132,75 @@ function storefrontReturnRoute(override = "") {
 function clearStorefrontSessionState() {
   state.sessionAuthenticated = false;
   state.sessionUser = {};
+  state.productPurchaseStatus = {};
+  state.productPurchaseStatusLoading = {};
   state.accountMenuOpen = false;
   clearStorefrontSessionTokens();
   clearStorefrontCartState({ loaded: true });
+}
+
+function orderHistoryListFromPayload(payload = {}) {
+  return firstArray(
+    payload?.orders,
+    payload?.baskets,
+    payload?.items,
+    payload?.data?.orders,
+    payload?.data?.baskets,
+    payload?.data?.items,
+    payload?.result?.orders,
+    payload?.result?.baskets,
+    payload?.payload?.orders,
+    payload?.payload?.baskets,
+  );
+}
+
+function orderItemsFromOrder(order = {}) {
+  return firstArray(order?.items, order?.basket_items, order?.lines, order?.products, order?.order_items, order?.data?.items, order?.bill?.items);
+}
+
+function orderItemProductId(item = {}) {
+  const product = item?.product && typeof item.product === "object" ? item.product : {};
+  return String(firstNonNull(item?.product_id, item?.productId, item?.product?.id, product.id, product.product_id, "") || "").trim();
+}
+
+function orderContainsProduct(order = {}, productId = "") {
+  const safeId = String(productId || "").trim();
+  if (!safeId) return false;
+  return orderItemsFromOrder(order).some((item) => orderItemProductId(item) === safeId);
+}
+
+async function ensureProductPurchaseStatus(productId = "") {
+  const safeId = String(productId || "").trim();
+  if (!safeId) return false;
+  if (!state.sessionAuthenticated) {
+    state.productPurchaseStatus[safeId] = false;
+    return false;
+  }
+  if (Object.prototype.hasOwnProperty.call(state.productPurchaseStatus, safeId)) {
+    return Boolean(state.productPurchaseStatus[safeId]);
+  }
+  if (state.productPurchaseStatusLoading[safeId]) return state.productPurchaseStatusLoading[safeId];
+
+  state.productPurchaseStatusLoading[safeId] = (async () => {
+    try {
+      const response = await fetch("/api/storefront/orders/history?type=PHYSICAL&limit=100", { headers: { Accept: "application/json" } });
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok || payload?.ok === false) {
+        state.productPurchaseStatus[safeId] = false;
+        return false;
+      }
+      const purchased = orderHistoryListFromPayload(payload).some((order) => orderContainsProduct(order, safeId));
+      state.productPurchaseStatus[safeId] = purchased;
+      return purchased;
+    } catch {
+      state.productPurchaseStatus[safeId] = false;
+      return false;
+    } finally {
+      delete state.productPurchaseStatusLoading[safeId];
+    }
+  })();
+
+  return state.productPurchaseStatusLoading[safeId];
 }
 
 function userDisplayName(user = {}) {
@@ -2997,6 +3786,122 @@ async function handleCheckoutSubmit(event) {
   }
 }
 
+async function handleProductReviewSubmit(event) {
+  const form = event.target.closest("[data-product-review-form]");
+  if (!form) return;
+
+  if (form.dataset.submitting === "1") return;
+  const productId = String(form.dataset.productReviewProduct || state.activeProductId || "").trim();
+  if (!productId) {
+    showToast("Product ID unknown.");
+    return;
+  }
+
+  if (!state.sessionAuthenticated) {
+    await fetchSessionStatus(true);
+    if (!state.sessionAuthenticated) {
+      showToast("Please log in before posting a review.");
+      navigateToAccount();
+      return;
+    }
+  }
+
+  const formData = Object.fromEntries(new FormData(form));
+  const comment = String(formData.comment || "").trim();
+  const canRateProduct = form.dataset.productCanRate === "1";
+  const reviewMode = form.dataset.reviewMode || "review";
+  const ratingInputs = [...form.querySelectorAll("[data-rating-input]")].filter((input) => !input.disabled);
+  const ratingCriterionIds = [...new Set(ratingInputs.map((input) => String(input.dataset.ratingCriterionId || "").trim()).filter(Boolean))];
+  const selectedRatingEntries = ratingCriterionIds
+    .map((criterionId) => {
+      const checked = ratingInputs.find((input) => input.dataset.ratingCriterionId === criterionId && input.checked);
+      const value = Number.parseInt(String(checked?.value || "0"), 10);
+      return checked && Number.isFinite(value) && value >= 1 && value <= 5 ? [criterionId, value] : null;
+    })
+    .filter(Boolean);
+  const userRating = Object.fromEntries(selectedRatingEntries);
+  const ratingValues = Object.values(userRating);
+  const averageRating = ratingValues.length ? ratingValues.reduce((sum, value) => sum + value, 0) / ratingValues.length : 0;
+  const requiresRating = canRateProduct && reviewMode !== "comment" && ratingCriterionIds.length > 0;
+  const requiresComment = reviewMode !== "rating";
+
+  if (reviewMode === "rating" && !ratingCriterionIds.length) {
+    showToast("Selldone XAPI did not return rating criteria for this product.");
+    return;
+  }
+  if (requiresRating && selectedRatingEntries.length !== ratingCriterionIds.length) {
+    showToast("Please rate every product criterion.");
+    return;
+  }
+  if (requiresComment && !comment) {
+    showToast("Please add a comment.");
+    return;
+  }
+
+  const submitButton = form.querySelector("[data-review-submit]");
+  form.dataset.submitting = "1";
+  submitButton?.setAttribute("disabled", "disabled");
+  if (submitButton) submitButton.textContent = "Submitting...";
+
+  try {
+    let submissionAccepted = false;
+    if (selectedRatingEntries.length || comment) {
+      const body = { mode: reviewMode };
+      if (selectedRatingEntries.length) body.user_rating = userRating;
+      if (comment) body.comment = comment;
+      const response = await fetch(`/api/storefront/products/${encodeURIComponent(productId)}/reviews`, {
+        method: "POST",
+        headers: {
+          Accept: "application/json",
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(body),
+      }).catch(() => null);
+      const result = await response?.json().catch(() => ({}));
+      if (!response || !response.ok || result?.ok === false) {
+        const responseMessage = String(result?.error || result?.message || "").trim();
+        if (response?.status === 401 || /authentication required/i.test(responseMessage)) {
+          showToast(responseMessage || "Please log in before posting a review.");
+          navigateToAccount();
+          return;
+        }
+        throw new Error(responseMessage || extractStorefrontErrorMessage(result, response?.status || 0) || "Selldone XAPI did not accept this submission.");
+      } else {
+        submissionAccepted = true;
+      }
+    }
+
+    if (!submissionAccepted) {
+      throw new Error("Selldone XAPI did not accept this submission.");
+    }
+
+    const product = getProductById(productId);
+    const reviewData = await fetchXapiProductReviews(productId).catch(() => null);
+    if (reviewData && product) {
+      applyProductReviewPayloadToProduct(product, reviewData);
+    } else {
+      await fetchXapiProductDetail(productId).catch(() => null);
+    }
+    showToast(reviewMode === "rating" ? "Thanks! Your rating was sent to Selldone." : "Thanks! Your comment was sent to Selldone.");
+    form.reset();
+    void renderProductPage(productId);
+  } catch (error) {
+    showToast(error?.message || "Could not send your comment right now.");
+  } finally {
+    form.dataset.submitting = "0";
+    if (submitButton) {
+      submitButton.textContent = reviewMode === "rating" ? "Submit" : "Save";
+      const currentComment = String(form.querySelector('textarea[name="comment"]')?.value || "").trim();
+      const ratingsComplete = !requiresRating || selectedRatingEntries.length === ratingCriterionIds.length;
+      if ((!requiresComment || currentComment) && ratingsComplete) {
+        submitButton.removeAttribute("disabled");
+      } else {
+        submitButton.setAttribute("disabled", "disabled");
+      }
+    }
+  }
+}
+
 function filterChip(category, label) {
   return `<button class="filter-chip ${state.activeCategory === category ? "is-active" : ""}" type="button" data-filter="${category}">${label}</button>`;
 }
@@ -3100,14 +4005,34 @@ function renderCategoryMedia(media) {
 }
 
 function accordionItem(title, body, open = false) {
+  return accordionItemContent(title, escapeHtml(body), open);
+}
+
+function accordionItemContent(title, content, open = false) {
   return `
     <div class="accordion-item ${open ? "is-open" : ""}">
       <button type="button" data-accordion-toggle>
         <span>${escapeHtml(title)}</span><span aria-hidden="true">+</span>
       </button>
-      <div class="accordion-body">${escapeHtml(body)}</div>
+      <div class="accordion-body">${content}</div>
     </div>
   `;
+}
+
+function renderProductSpecsAccordionItem(item = {}) {
+  const specs = Array.isArray(item.specs) ? item.specs : [];
+  if (!specs.length) return "";
+  const rows = specs
+    .map(
+      (spec) => `
+        <div class="product-spec-row">
+          <dt>${escapeHtml(spec.label)}</dt>
+          <dd>${escapeHtml(spec.value)}</dd>
+        </div>
+      `,
+    )
+    .join("");
+  return accordionItemContent("Specifications", `<dl class="product-spec-list">${rows}</dl>`, false);
 }
 
 function miniProduct(item) {
@@ -3574,6 +4499,7 @@ const {
   DATA_SOURCE,
   getProductById,
   fetchXapiProductDetail,
+  fetchXapiProductReviews,
   fetchSessionStatus,
   navigateToAccount,
   addToCart,
@@ -3914,7 +4840,7 @@ function isStorefrontCartAuthError(status = 0, message = "") {
   return status === 401 || status === 403 || /please log|login first|not authorized|unauthor|token|authorization|session/i.test(message);
 }
 
-function storefrontCartRequestBody(item, selectedVariantId, count) {
+function storefrontCartRequestBody(item, selectedVariantId, count, delivery = null) {
   const body = {
     count: Math.max(0, Number.parseInt(count, 10) || 0),
     currency: firstNonNull(item?.currency, "$"),
@@ -3922,10 +4848,19 @@ function storefrontCartRequestBody(item, selectedVariantId, count) {
   if (selectedVariantId) {
     body.variant_id = selectedVariantId;
   }
+  if (delivery && typeof delivery === "object") {
+    body.shipping_key = delivery.shipping_key || delivery.key || "";
+    body.delivery_info = delivery;
+    body.shipping = delivery;
+    body.preferences = {
+      ...(body.preferences && typeof body.preferences === "object" ? body.preferences : {}),
+      storefront_delivery: delivery,
+    };
+  }
   return body;
 }
 
-async function requestStorefrontCartMutation(productId, requestBody = {}, method = "PUT") {
+async function requestStorefrontCartMutation(productId, requestBody = {}, method = "PUT", fallbackRequestBody = null) {
   try {
     const response = await fetch(`/api/storefront/basket/${encodeURIComponent(String(productId))}`, {
       method,
@@ -3946,6 +4881,9 @@ async function requestStorefrontCartMutation(productId, requestBody = {}, method
       if (isStorefrontCartAuthError(response.status, errorMessage)) {
         clearStorefrontSessionState();
         updateAccountButton();
+      }
+      if (fallbackRequestBody && response.status !== 401 && response.status !== 403) {
+        return requestStorefrontCartMutation(productId, fallbackRequestBody, method, null);
       }
       return { ok: false, status: response.status, error: errorMessage, result };
     }
@@ -4256,11 +5194,24 @@ async function addToCartAsync(productId, variantKey = "", options = {}) {
   }
 
   const nextCount = Math.max(1, toNumber(state.cart[lineKey], 0) + 1);
-  const requestBody = storefrontCartRequestBody(item, selectedVariantId, nextCount);
+  const transportations = await ensureShopTransportationsLoaded();
+  const selectedShippingKey = firstNonNull(
+    state.activeProductShippingSelection[item.id],
+    state.activeCheckoutShippingKey,
+    transportSelectionKey(transportations?.[0], "shipping-default"),
+  );
+  const selectedTransport = pickTransportByKey(transportations, selectedShippingKey);
+  const deliveryPayload = cartDeliveryPayloadFromTransport(selectedTransport, selectedShippingKey) || cartDeliveryPayloadFromKey(selectedShippingKey);
+  if (selectedShippingKey) {
+    state.activeProductShippingSelection[item.id] = selectedShippingKey;
+    state.activeCheckoutShippingKey = selectedShippingKey;
+  }
+  const requestBody = storefrontCartRequestBody(item, selectedVariantId, nextCount, deliveryPayload);
+  const fallbackRequestBody = deliveryPayload ? storefrontCartRequestBody(item, selectedVariantId, nextCount) : null;
   state.cartUpdatingKeys.add(lineKey);
   renderCart();
 
-  const mutation = await requestStorefrontCartMutation(item.id, requestBody, "PUT");
+  const mutation = await requestStorefrontCartMutation(item.id, requestBody, "PUT", fallbackRequestBody);
   state.cartUpdatingKeys.delete(lineKey);
 
   if (!mutation.ok) {
@@ -4700,13 +5651,23 @@ async function renderShopPage() {
 }
 
 async function renderProductPage(productId) {
+  const id = String(productId || state.activeProductId || "").trim();
+  let cachedProduct = getProductById(id);
+  if (!cachedProduct) {
+    await ensureProductsForPage().catch(() => null);
+    cachedProduct = getProductById(id);
+  }
+  if (!cachedProduct || !cachedProduct.reviewsLoaded || productNeedsStorefrontDetail(cachedProduct)) {
+    await fetchXapiProductDetail(id).catch(() => null);
+  }
   return renderProductPageModule({
-    productId,
+    productId: id || productId,
     state,
     DATA_SOURCE,
     els,
     getProductById,
     fetchXapiProductDetail,
+    fetchXapiProductReviews,
     ensureProductsForPage,
     productNeedsStorefrontDetail,
     renderLiveCatalogEmptyState,
@@ -5064,6 +6025,7 @@ export {
   getItemVariants,
   getProductById,
   handleCheckoutSubmit,
+  handleProductReviewSubmit,
   handleQuickBuySubmit,
   initializeStorefrontSession,
   navigateToAccount,

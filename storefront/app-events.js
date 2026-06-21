@@ -1,4 +1,16 @@
-import * as storefront from "./app-core.js?v=storefront-product-article-wide-20260621";
+import * as storefront from "./app-core.js?v=storefront-my-rating-prefill-aliases-20260621";
+
+function reviewQualityLabel(value) {
+  return (
+    {
+      1: "Poor",
+      2: "Fair",
+      3: "Good",
+      4: "Very good",
+      5: "Excellent",
+    }[Number(value)] || "Choose"
+  );
+}
 
 const {
   state,
@@ -15,6 +27,7 @@ const {
   getItemVariants,
   getProductById,
   handleCheckoutSubmit,
+  handleProductReviewSubmit,
   handleQuickBuySubmit,
   initializeStorefrontSession,
   navigateToAccount,
@@ -78,6 +91,33 @@ function syncFavoriteButtons(productId = "", isActive = false) {
   });
 }
 
+function updateReviewSubmitState(form) {
+  if (!form) return;
+  const submit = form.querySelector("[data-review-submit]");
+  if (!submit) return;
+  const comment = String(form.querySelector('textarea[name="comment"]')?.value || "").trim();
+  const canRate = form.dataset.productCanRate === "1";
+  const reviewMode = form.dataset.reviewMode || "review";
+  const ratingInputs = [...form.querySelectorAll("[data-rating-input]")].filter((input) => !input.disabled);
+  form.querySelectorAll("[data-rating-criterion]").forEach((criterion) => {
+    const checked = criterion.querySelector("[data-rating-input]:checked");
+    const value = checked ? Number(checked.value) : 0;
+    const quality = criterion.querySelector("[data-rating-quality]");
+    const progress = criterion.querySelector("[data-rating-progress]");
+    criterion.dataset.ratingValue = value ? String(value) : "";
+    if (quality) quality.textContent = value ? reviewQualityLabel(value) : "Choose";
+    if (progress) progress.style.setProperty("--rating-progress", value ? `${value * 20}%` : "0%");
+  });
+  const criterionIds = [...new Set(ratingInputs.map((input) => String(input.dataset.ratingCriterionId || "").trim()).filter(Boolean))];
+  const requiresComment = reviewMode !== "rating";
+  const requiresRating = canRate && reviewMode !== "comment" && criterionIds.length > 0;
+  const ratingFormUnavailable = reviewMode === "rating" && !criterionIds.length;
+  const ratingsComplete =
+    !requiresRating ||
+    criterionIds.every((criterionId) => ratingInputs.some((input) => input.dataset.ratingCriterionId === criterionId && input.checked));
+  submit.disabled = ratingFormUnavailable || (requiresComment && !comment) || !ratingsComplete || form.dataset.submitting === "1";
+}
+
 function toggleFavoriteProduct(productId = "") {
   const id = String(productId || "").trim();
   if (!id) return false;
@@ -94,6 +134,36 @@ export function registerStorefrontInteractions() {
     const accountControl = event.target.closest("[data-account-control]");
     if (!accountControl && state.accountMenuOpen) {
       closeAccountMenu();
+    }
+
+    const reviewCancelControl = event.target.closest("[data-review-cancel]");
+    if (reviewCancelControl) {
+      event.preventDefault();
+      const reviewForm = reviewCancelControl.closest("[data-product-review-form]");
+      if (reviewForm) {
+        reviewForm.hidden = true;
+        reviewForm.dataset.submitting = "0";
+        document.querySelectorAll(`[data-edit-my-review="${CSS.escape(reviewForm.id)}"]`).forEach((trigger) => {
+          trigger.hidden = false;
+          trigger.setAttribute("aria-expanded", "false");
+        });
+      }
+      return;
+    }
+
+    const editMyReviewControl = event.target.closest("[data-edit-my-review]");
+    if (editMyReviewControl) {
+      event.preventDefault();
+      const targetId = String(editMyReviewControl.dataset.editMyReview || "").trim();
+      const reviewForm = targetId ? document.getElementById(targetId) : null;
+      if (reviewForm) {
+        reviewForm.hidden = false;
+        editMyReviewControl.hidden = true;
+        editMyReviewControl.setAttribute("aria-expanded", "true");
+        updateReviewSubmitState(reviewForm);
+        reviewForm.querySelector('textarea[name="comment"], [data-rating-input]:not(:disabled)')?.focus();
+      }
+      return;
     }
 
     const categoryMenuOpen = event.target.closest("[data-category-menu-open]");
@@ -257,6 +327,20 @@ export function registerStorefrontInteractions() {
       return;
     }
 
+    const reviewScroll = event.target.closest("[data-review-scroll]");
+    if (reviewScroll) {
+      event.preventDefault();
+      const targetSelector = String(reviewScroll.dataset.reviewScroll || "").trim();
+      const target = targetSelector ? document.querySelector(targetSelector) : null;
+      if (!target) return;
+      target.scrollIntoView({ behavior: "smooth", block: "start" });
+      window.setTimeout(() => {
+        const focusTarget = target.querySelector("[data-rating-input]:not(:disabled), textarea[name='comment']");
+        focusTarget?.focus({ preventScroll: true });
+      }, 250);
+      return;
+    }
+
     const deliveryOption = event.target.closest("[data-delivery-option]");
     if (deliveryOption) {
       const context = String(deliveryOption.dataset.deliveryContext || "").trim().toLowerCase();
@@ -272,6 +356,7 @@ export function registerStorefrontInteractions() {
 
       if (productId) {
         state.activeProductShippingSelection[String(productId)] = key;
+        state.activeCheckoutShippingKey = key;
         renderProductPage(productId);
         return;
       }
@@ -400,6 +485,12 @@ export function registerStorefrontInteractions() {
   });
 
   document.addEventListener("change", (event) => {
+    const reviewForm = event.target.closest("[data-product-review-form]");
+    if (reviewForm) {
+      updateReviewSubmitState(reviewForm);
+      return;
+    }
+
     const cartQuantity = event.target.closest("[data-cart-quantity]");
     if (cartQuantity) {
       void setCartQuantity(cartQuantity.dataset.cartQuantity, cartQuantity.value);
@@ -410,6 +501,11 @@ export function registerStorefrontInteractions() {
     if (!sort) return;
     state.activeSort = sort.value;
     renderShopPage();
+  });
+
+  document.addEventListener("input", (event) => {
+    const reviewForm = event.target.closest("[data-product-review-form]");
+    if (reviewForm) updateReviewSubmitState(reviewForm);
   });
 
   document.querySelector("[data-search-form]")?.addEventListener("submit", (event) => {
@@ -515,10 +611,17 @@ export function registerStorefrontInteractions() {
   });
 
   document.addEventListener("submit", (event) => {
-    const quickBuyForm = event.target.closest("[data-quick-buy-form]");
+  const quickBuyForm = event.target.closest("[data-quick-buy-form]");
     if (quickBuyForm) {
       event.preventDefault();
       void handleQuickBuySubmit(event);
+      return;
+    }
+
+    const reviewForm = event.target.closest("[data-product-review-form]");
+    if (reviewForm) {
+      event.preventDefault();
+      void handleProductReviewSubmit(event);
       return;
     }
 
