@@ -1,11 +1,11 @@
 import { selldoneImagePathToUrl } from "/dashboard/features/selldone-images.js?v=storefront-cart-image-20260614b";
-import { renderHomePage as renderHomePageModule } from "./home-page.js?v=storefront-inline-stripe-payment-20260621";
-import { renderProductPage as renderProductPageModule } from "./product-page.js?v=storefront-inline-stripe-payment-20260621";
-import { renderUserMenu } from "./user-menu.js?v=storefront-inline-stripe-payment-20260621";
-import { renderAccountProfileOverviewPage } from "./account-profile.js?v=storefront-inline-stripe-payment-20260621";
-import { renderOrderHistoryPage } from "./order-history.js?v=storefront-inline-stripe-payment-20260621";
-import { renderOrderDetailPage } from "./order-detail.js?v=storefront-inline-stripe-payment-20260621";
-import { createStorefrontPayments } from "./payments.js?v=storefront-inline-stripe-payment-20260621";
+import { renderHomePage as renderHomePageModule } from "./home-page.js?v=storefront-profile-color-swatch-20260621";
+import { renderProductPage as renderProductPageModule } from "./product-page.js?v=storefront-profile-color-swatch-20260621";
+import { renderUserMenu } from "./user-menu.js?v=storefront-profile-color-swatch-20260621";
+import { renderAccountProfileOverviewPage } from "./account-profile.js?v=storefront-profile-color-swatch-20260621";
+import { renderOrderHistoryPage } from "./order-history.js?v=storefront-profile-color-swatch-20260621";
+import { renderOrderDetailPage } from "./order-detail.js?v=storefront-profile-color-swatch-20260621";
+import { createStorefrontPayments } from "./payments.js?v=storefront-profile-color-swatch-20260621";
 
 const SPRITE_COLUMNS = 4;
 const SPRITE_ROWS = 4;
@@ -92,6 +92,7 @@ const shadePalette = [
 
 const state = {
   cart: readCart(),
+  cartLineDetails: {},
   cartSummary: null,
   activeCategory: "all",
   activeDiscountOnly: false,
@@ -1031,6 +1032,79 @@ function variantLabel(variant, index = 0) {
     fallback,
     `Variant ${index + 1}`,
   );
+}
+
+function isTechnicalColorValue(value) {
+  const color = String(value || "").trim();
+  return /^#([0-9a-f]{3}|[0-9a-f]{4}|[0-9a-f]{6}|[0-9a-f]{8})$/i.test(color) || /^(rgba?|hsla?)\(/i.test(color);
+}
+
+function safeVariantSwatchColor(value) {
+  const color = String(value || "").trim();
+  if (/^#([0-9a-f]{3}|[0-9a-f]{4}|[0-9a-f]{6}|[0-9a-f]{8})$/i.test(color)) return color;
+  if (/^[a-zA-Z]+$/.test(color)) return color;
+  if (/^rgba?\(\s*\d{1,3}\s*,\s*\d{1,3}\s*,\s*\d{1,3}(?:\s*,\s*(?:0|1|0?\.\d+))?\s*\)$/i.test(color)) return color;
+  return "";
+}
+
+function variantOptionDisplayValue(option = {}, variant = {}) {
+  if (option.key !== "color") return cleanVariantOptionValue(option.display);
+  const namedColor = firstNonNull(
+    variant?.color_name,
+    variant?.colour_name,
+    variant?.color_title,
+    variant?.colour_title,
+    variant?.color_label,
+    variant?.colour_label,
+  );
+  const namedColorText = cleanVariantOptionValue(namedColor);
+  if (namedColorText) return namedColorText;
+  const display = cleanVariantOptionValue(option.display);
+  return isTechnicalColorValue(display) ? "" : display;
+}
+
+function variantDetailEntries(variant, index = 0) {
+  if (!variant || typeof variant !== "object") return [];
+  const options = (Array.isArray(variant.__options) && variant.__options.length ? variant.__options : extractVariantOptionEntries(variant))
+    .map((option) => ({
+      label: option.label || variantOptionLabel(option.key),
+      display: variantOptionDisplayValue(option, variant),
+      key: option.key,
+      swatch: option.key === "color"
+        ? safeVariantSwatchColor(firstNonNull(option.swatch, variant?.__swatchColor, variant?.hex, variant?.color_code, variant?.colour_code, variant?.swatch_color, variant?.color, variant?.colour, ""))
+        : "",
+    }))
+    .filter((option) => option.display || option.swatch);
+  const seen = new Set();
+  const uniqueOptions = options.filter((option) => {
+    const signature = `${option.key}:${String(option.display).toLowerCase()}:${String(option.swatch).toLowerCase()}`;
+    if (seen.has(signature)) return false;
+    seen.add(signature);
+    return true;
+  });
+  if (uniqueOptions.length) return uniqueOptions;
+  const fallback = cleanVariantOptionValue(variantLabel(variant, index));
+  if (!fallback || isTechnicalColorValue(fallback)) return [];
+  return [{ label: "Variant", display: fallback, key: "variant" }];
+}
+
+function variantDetailsText(variant, index = 0) {
+  return variantDetailEntries(variant, index)
+    .map((entry) => `${entry.label}: ${entry.display}`)
+    .join(" / ");
+}
+
+function variantDetailsMarkup(variant, index = 0, className = "variant-detail-list") {
+  const entries = variantDetailEntries(variant, index);
+  if (!entries.length) return "";
+  return `
+    <dl class="${escapeHtml(className)}">
+      ${entries.map((entry) => {
+        const swatch = entry.swatch ? `<span class="variant-detail-swatch" style="--variant-swatch:${escapeHtml(entry.swatch)}" aria-hidden="true"></span>` : "";
+        return `<div>${swatch}<dt>${escapeHtml(entry.label)}</dt>${entry.display ? `<dd>${escapeHtml(entry.display)}</dd>` : ""}</div>`;
+      }).join("")}
+    </dl>
+  `;
 }
 
 function variantChipLabel(variant, index = 0) {
@@ -2453,7 +2527,7 @@ function checkoutLineItem(entry = {}) {
   const productHref = `#product/${encodeURIComponent(String(item.id || entry.productId || ""))}`;
   const activeMedia = variantPrimaryImage(variant) || item.image;
   const currency = firstNonNull(item.currency, "$");
-  const variantText = variant ? variantLabel(variant, variant.__index || 0) : "";
+  const variantMarkup = variantDetailsMarkup(variant, variant?.__index || 0, "checkout-variant-details");
   return `
     <article class="checkout-line-item">
       <a class="checkout-line-media checkout-line-link" href="${productHref}" aria-label="${escapeHtml(item.title || "Product")}">
@@ -2461,7 +2535,7 @@ function checkoutLineItem(entry = {}) {
       </a>
       <div>
         <h4><a class="checkout-title-link" href="${productHref}">${escapeHtml(item.title || "Product")}</a></h4>
-        ${variantText ? `<p>${escapeHtml(variantText)}</p>` : ""}
+        ${variantMarkup}
         <p>${escapeHtml(`${qty} ${qty === 1 ? "item" : "items"}`)}</p>
       </div>
       <div class="checkout-line-pricing">
@@ -3073,6 +3147,72 @@ function cartLineVariant(item, rawVariantKey = "") {
   return activeProductVariant(item) || candidates[0]?.variant || null;
 }
 
+function basketLineVariantPayload(line = {}) {
+  const source =
+    line?.variant && typeof line.variant === "object"
+      ? line.variant
+      : line?.product_variant && typeof line.product_variant === "object"
+        ? line.product_variant
+        : line?.productVariant && typeof line.productVariant === "object"
+          ? line.productVariant
+          : line?.variation && typeof line.variation === "object"
+            ? line.variation
+            : line?.selected_variant && typeof line.selected_variant === "object"
+              ? line.selected_variant
+              : null;
+  const variant = source ? { ...source } : {};
+  const assign = (key, ...values) => {
+    const value = firstNonNull(...values);
+    if (value === null || value === undefined || value === "") return;
+    variant[key] = value;
+  };
+
+  assign("id", line?.variant_id, line?.variantId, line?.product_variant_id, line?.productVariantId, variant.id);
+  assign("variant_id", line?.variant_id, line?.variantId, line?.product_variant_id, line?.productVariantId, variant.variant_id);
+  assign("title", line?.variant_title, line?.variantTitle, line?.variation_title, line?.variationTitle, variant.title);
+  assign("name", line?.variant_name, line?.variantName, line?.variation_name, line?.variationName, variant.name);
+  assign("color", line?.color, line?.colour, line?.color_code, line?.colour_code, variant.color);
+  assign("color_name", line?.color_name, line?.colour_name, line?.colorTitle, line?.colourTitle, variant.color_name);
+  assign("size", line?.size, line?.size_name, line?.option_size, variant.size);
+  assign("volume", line?.volume, line?.volume_name, line?.capacity, line?.ml, variant.volume);
+  assign("weight", line?.weight, line?.weight_name, line?.g, line?.gr, variant.weight);
+  assign("scent", line?.scent, line?.fragrance, line?.perfume, variant.scent);
+  assign("pack", line?.pack, line?.package, line?.bundle, variant.pack);
+  assign("style", line?.style, line?.model, variant.style);
+  assign("options", line?.options, line?.option, line?.attributes, line?.properties, line?.variant_options, variant.options);
+
+  return Object.keys(variant).length ? variant : null;
+}
+
+function mergeCartLineVariant(baseVariant = null, basketVariant = null, lineKey = "") {
+  if (!basketVariant || typeof basketVariant !== "object") return baseVariant;
+  const merged = {
+    ...(baseVariant && typeof baseVariant === "object" ? baseVariant : {}),
+    ...basketVariant,
+  };
+  merged.__index = firstNonNull(baseVariant?.__index, basketVariant.__index, 0);
+  merged.__key = firstNonNull(baseVariant?.__key, basketVariant.__key, lineKey);
+  merged.__swatchColor = firstNonNull(
+    baseVariant?.__swatchColor,
+    basketVariant.__swatchColor,
+    basketVariant.hex,
+    basketVariant.color_code,
+    basketVariant.colour_code,
+    basketVariant.swatch_color,
+    basketVariant.color,
+    basketVariant.colour,
+    "",
+  );
+  const optionEntries = extractVariantOptionEntries(merged);
+  if (optionEntries.length) {
+    merged.__options = optionEntries;
+    merged.__optionMap = Object.fromEntries(optionEntries.map((option) => [option.key, option.value]));
+    merged.__optionLabels = Object.fromEntries(optionEntries.map((option) => [option.key, option.label]));
+    merged.__optionDisplays = Object.fromEntries(optionEntries.map((option) => [option.key, option.display]));
+  }
+  return merged;
+}
+
 function resolveCartLineVariantMatch(item, rawVariantKey = "") {
   const variants = getItemVariants(item);
   const key = String(rawVariantKey || "").trim();
@@ -3314,6 +3454,7 @@ function syncCartFromBasketPayload(payload = {}) {
   const entries = basketLineEntries(basket);
 
   const nextCart = {};
+  const nextCartLineDetails = {};
   entries.forEach((line) => {
     const productId = firstNonNull(
       line?.product_id,
@@ -3356,9 +3497,14 @@ function syncCartFromBasketPayload(payload = {}) {
     const key = cartLineKey(String(productId), variantKey);
     if (!key) return;
     nextCart[key] = qty;
+    const basketVariant = basketLineVariantPayload(line);
+    if (basketVariant) {
+      nextCartLineDetails[key] = { variant: basketVariant };
+    }
   });
 
   state.cart = nextCart;
+  state.cartLineDetails = nextCartLineDetails;
   state.cartSummary = basket?.bill && typeof basket.bill === "object" ? basket.bill : null;
   state.cartLoaded = true;
   state.cartLoadError = "";
@@ -3374,6 +3520,7 @@ function syncCartSummary(payload = null) {
 
 function clearStorefrontCartState({ loaded = false } = {}) {
   state.cart = {};
+  state.cartLineDetails = {};
   state.cartSummary = null;
   state.cartLoaded = loaded;
   state.cartLoading = false;
@@ -3761,7 +3908,9 @@ function cartEntries() {
       const item = getProductById(productId);
       if (!item || !qty || qty <= 0) return null;
 
-      const variant = cartLineVariant(item, variantKey);
+      const baseVariant = cartLineVariant(item, variantKey);
+      const basketVariant = state.cartLineDetails?.[rawKey]?.variant || null;
+      const variant = mergeCartLineVariant(baseVariant, basketVariant, rawKey);
       const variantPrice = resolveVariantPrice(variant, item.price);
       return {
         lineKey: String(rawKey),
@@ -4003,13 +4152,14 @@ function renderCart() {
             item.images?.[0],
           );
           const productHref = `#product/${encodeURIComponent(String(item.id))}`;
+          const variantMarkup = variantDetailsMarkup(variant, variant?.__index || 0, "cart-variant-details");
           return `
             <article class="cart-item ${isUpdating ? "is-updating" : ""}">
               <a class="cart-item-media cart-item-link" href="${productHref}" data-cart-product-link>${renderProductImage(item, "thumbnail-sprite", activeMedia)}</a>
               <div class="cart-item-copy">
                 <h3><a class="cart-item-title-link" href="${productHref}" data-cart-product-link>${escapeHtml(item.title)}</a></h3>
                 <p>${escapeHtml(item.brand)}</p>
-                ${variant ? `<span class="product-meta">${escapeHtml(variantLabel(variant, variant.__index || 0))}</span>` : ""}
+                ${variantMarkup}
                 <div class="cart-item-prices">
                   <strong>${formatPrice(linePrice, item.currency)}</strong>
                   <span>${formatPrice(linePrice * qty, item.currency)} line total</span>

@@ -2844,6 +2844,56 @@ img.large-sprite {
   font-size: 11px;
 }
 
+.cart-variant-details,
+.checkout-variant-details {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  margin: 6px 0 0;
+}
+
+.cart-variant-details div,
+.checkout-variant-details div {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  max-width: 100%;
+  padding: 3px 7px;
+  border: 1px solid rgba(29, 29, 31, 0.08);
+  border-radius: 999px;
+  background: #f7f7f4;
+}
+
+.variant-detail-swatch {
+  width: 11px;
+  height: 11px;
+  flex: 0 0 11px;
+  border: 1px solid rgba(29, 29, 31, 0.18);
+  border-radius: 999px;
+  background: var(--variant-swatch, #ffffff);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.42);
+}
+
+.cart-variant-details dt,
+.checkout-variant-details dt {
+  color: var(--muted);
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.cart-variant-details dd,
+.checkout-variant-details dd {
+  margin: 0;
+  overflow: hidden;
+  color: #1d1d1f;
+  font-size: 10px;
+  font-weight: 800;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .cart-item-copy {
   min-width: 0;
 }
@@ -3156,6 +3206,10 @@ img.large-sprite {
 
 .checkout-line-item p {
   margin: 0;
+}
+
+.checkout-variant-details {
+  margin-bottom: 4px;
 }
 
 .checkout-line-pricing {
@@ -4721,6 +4775,12 @@ img.large-sprite {
   object-fit: cover;
 }
 
+.account-profile-cart-text {
+  display: grid;
+  min-width: 0;
+  gap: 2px;
+}
+
 .account-profile-cart-title {
   min-width: 0;
   overflow: hidden;
@@ -4728,6 +4788,36 @@ img.large-sprite {
   font-weight: 740;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.account-profile-cart-variant {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  min-width: 0;
+  overflow: hidden;
+  color: #6e6e73;
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.account-profile-cart-variant-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+}
+
+.account-profile-cart-swatch {
+  width: 10px;
+  height: 10px;
+  flex: 0 0 10px;
+  border: 1px solid rgba(29, 29, 31, 0.18);
+  border-radius: 999px;
+  background: var(--variant-swatch, #ffffff);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.42);
 }
 
 .account-profile-cart-line strong {

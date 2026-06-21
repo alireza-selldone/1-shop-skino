@@ -45,17 +45,92 @@ function profileCartImage(entry = {}, firstNonNull) {
   return "";
 }
 
+function profileVariantValue(value) {
+  if (value === null || value === undefined) return "";
+  if (typeof value === "object") {
+    return String(value.value || value.name || value.title || value.label || value.text || "").trim();
+  }
+  return String(value).trim();
+}
+
+function profileIsTechnicalColor(value) {
+  const color = profileVariantValue(value);
+  return /^#([0-9a-f]{3}|[0-9a-f]{4}|[0-9a-f]{6}|[0-9a-f]{8})$/i.test(color) || /^(rgba?|hsla?)\(/i.test(color);
+}
+
+function profileSafeSwatchColor(value) {
+  const color = profileVariantValue(value);
+  if (/^#([0-9a-f]{3}|[0-9a-f]{4}|[0-9a-f]{6}|[0-9a-f]{8})$/i.test(color)) return color;
+  if (/^[a-zA-Z]+$/.test(color)) return color;
+  if (/^rgba?\(\s*\d{1,3}\s*,\s*\d{1,3}\s*,\s*\d{1,3}(?:\s*,\s*(?:0|1|0?\.\d+))?\s*\)$/i.test(color)) return color;
+  return "";
+}
+
+function profileCartVariantEntries(entry = {}, firstNonNull) {
+  const source = entry?.item && typeof entry.item === "object" ? entry.item : entry;
+  const variant = entry?.variant && typeof entry.variant === "object" ? entry.variant : source?.variant && typeof source.variant === "object" ? source.variant : null;
+  if (!variant) return [];
+
+  const entries = [];
+  const seen = new Set();
+  const push = (label, value, key = label, swatchValue = "") => {
+    let display = profileVariantValue(value);
+    const swatch = key === "color" ? profileSafeSwatchColor(firstNonNull(swatchValue, value)) : "";
+    if (key === "color" && profileIsTechnicalColor(display)) display = "";
+    if (!label || (!display && !swatch)) return;
+    const signature = `${key}:${display.toLowerCase()}:${swatch.toLowerCase()}`;
+    if (seen.has(signature)) return;
+    seen.add(signature);
+    entries.push({ label, display, swatch });
+  };
+
+  if (Array.isArray(variant.__options)) {
+    variant.__options.forEach((option) => {
+      const key = String(option?.key || option?.label || "").trim().toLowerCase();
+      const label = option?.label || (key ? key[0].toUpperCase() + key.slice(1) : "Variant");
+      const display = key === "color" ? firstNonNull(variant.color_name, variant.colour_name, option?.display) : option?.display;
+      push(label, display, key, firstNonNull(option?.swatch, variant.__swatchColor, variant.hex, variant.color_code, variant.colour_code, variant.swatch_color, variant.color, variant.colour));
+    });
+  }
+
+  push(
+    "Color",
+    firstNonNull(variant.color_name, variant.colour_name, variant.color_title, variant.colour_title, variant.color, variant.colour),
+    "color",
+    firstNonNull(variant.__swatchColor, variant.hex, variant.color_code, variant.colour_code, variant.swatch_color, variant.color, variant.colour),
+  );
+  push("Size", firstNonNull(variant.size, variant.size_name, variant.option_size), "size");
+  push("Volume", firstNonNull(variant.volume, variant.volume_name, variant.capacity, variant.ml), "volume");
+  push("Weight", firstNonNull(variant.weight, variant.weight_name, variant.g, variant.gr), "weight");
+  push("Scent", firstNonNull(variant.scent, variant.fragrance, variant.perfume), "scent");
+  push("Pack", firstNonNull(variant.pack, variant.package, variant.bundle), "pack");
+  push("Style", firstNonNull(variant.style, variant.model), "style");
+
+  if (!entries.length) {
+    push("Variant", firstNonNull(variant.title, variant.name, variant.label, variant.option_name), "variant");
+  }
+
+  return entries;
+}
+
 function renderCartPreview(entries = [], escapeHtml, firstNonNull) {
   return entries.slice(0, 4).map((entry) => {
     const item = profileCartProduct(entry, firstNonNull);
     const image = profileCartImage(entry, firstNonNull);
+    const variantEntries = profileCartVariantEntries(entry, firstNonNull);
+    const variantMarkup = variantEntries.length
+      ? `<span class="account-profile-cart-variant">${variantEntries.map((variant) => `<span class="account-profile-cart-variant-item">${variant.swatch ? `<span class="account-profile-cart-swatch" style="--variant-swatch:${escapeHtml(variant.swatch)}" aria-hidden="true"></span>` : ""}<span>${escapeHtml(variant.display ? `${variant.label}: ${variant.display}` : variant.label)}</span></span>`).join("")}</span>`
+      : "";
     return `
       <a class="account-profile-cart-line" href="${escapeHtml(item.href)}">
         <span class="account-profile-cart-product">
           <span class="account-profile-cart-thumb" aria-hidden="true">
             ${image ? `<img src="${escapeHtml(image)}" alt="" loading="lazy" />` : `<span>${escapeHtml(item.title.slice(0, 1).toUpperCase() || "P")}</span>`}
           </span>
-          <span class="account-profile-cart-title">${escapeHtml(item.title)}</span>
+          <span class="account-profile-cart-text">
+            <span class="account-profile-cart-title">${escapeHtml(item.title)}</span>
+            ${variantMarkup}
+          </span>
         </span>
         <strong>${escapeHtml(`x${item.quantity}`)}</strong>
       </a>
