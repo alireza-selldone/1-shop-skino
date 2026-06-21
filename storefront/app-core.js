@@ -1,11 +1,11 @@
 import { selldoneImagePathToUrl } from "/dashboard/features/selldone-images.js?v=storefront-cart-image-20260614b";
-import { renderHomePage as renderHomePageModule } from "./home-page.js?v=storefront-promo-short-20260620";
-import { renderProductPage as renderProductPageModule } from "./product-page.js?v=storefront-promo-short-20260620";
-import { renderUserMenu } from "./user-menu.js?v=storefront-promo-short-20260620";
-import { renderAccountProfileOverviewPage } from "./account-profile.js?v=storefront-promo-short-20260620";
-import { renderOrderHistoryPage } from "./order-history.js?v=storefront-promo-short-20260620";
-import { renderOrderDetailPage } from "./order-detail.js?v=storefront-promo-short-20260620";
-import { createStorefrontPayments } from "./payments.js?v=storefront-promo-short-20260620";
+import { renderHomePage as renderHomePageModule } from "./home-page.js?v=storefront-inline-stripe-payment-20260621";
+import { renderProductPage as renderProductPageModule } from "./product-page.js?v=storefront-inline-stripe-payment-20260621";
+import { renderUserMenu } from "./user-menu.js?v=storefront-inline-stripe-payment-20260621";
+import { renderAccountProfileOverviewPage } from "./account-profile.js?v=storefront-inline-stripe-payment-20260621";
+import { renderOrderHistoryPage } from "./order-history.js?v=storefront-inline-stripe-payment-20260621";
+import { renderOrderDetailPage } from "./order-detail.js?v=storefront-inline-stripe-payment-20260621";
+import { createStorefrontPayments } from "./payments.js?v=storefront-inline-stripe-payment-20260621";
 
 const SPRITE_COLUMNS = 4;
 const SPRITE_ROWS = 4;
@@ -1869,6 +1869,22 @@ function transportationSelectionExists(transportations, key) {
   return pickTransportByKey(transportations, key) !== null;
 }
 
+function resolveCheckoutTransport(transportations = [], selectedKey = "") {
+  const normalized = normalizeShopTransportations(transportations);
+  if (!normalized.length) return null;
+
+  const selected = pickTransportByKey(normalized, selectedKey);
+  if (selected) return selected;
+
+  const fallbackType = String(selectedKey || "").replace(/-default$/, "").trim().toLowerCase();
+  if (fallbackType) {
+    const byType = normalized.find((transport) => String(transportTypeValue(transport) || "").trim().toLowerCase() === fallbackType);
+    if (byType) return byType;
+  }
+
+  return normalized.find((transport) => String(transportTypeValue(transport) || "").trim().toLowerCase() === "shipping") || normalized[0] || null;
+}
+
 function renderDeliveryCards(transportations = [], options = {}) {
   const normalized = normalizeShopTransportations(transportations);
   const productId = firstNonNull(options.productId, "");
@@ -2378,7 +2394,105 @@ async function renderAccountProfilePage(section = "profile") {
   });
 }
 
+function checkoutBillMessages(bill = {}) {
+  const messages = [];
+  const visited = new WeakSet();
+  const pushMessage = (value) => {
+    const text = String(value || "").trim();
+    if (!text || messages.includes(text)) return;
+    messages.push(text);
+  };
+  const collect = (value) => {
+    if (value == null || value === false) return;
+    if (typeof value === "string" || typeof value === "number") {
+      pushMessage(value);
+      return;
+    }
+    if (Array.isArray(value)) {
+      value.forEach(collect);
+      return;
+    }
+    if (typeof value !== "object" || visited.has(value)) return;
+    visited.add(value);
+    [
+      value.message,
+      value.error,
+      value.error_msg,
+      value.error_message,
+      value.warning,
+      value.notice,
+      value.reason,
+      value.description,
+      value.status_message,
+      value.statusMessage,
+      value.title,
+    ].forEach(collect);
+    [value.messages, value.errors, value.warnings, value.alerts, value.notifications, value.details].forEach(collect);
+  };
+
+  collect(bill?.messages);
+  collect(bill?.errors);
+  collect(bill?.warnings);
+  collect(bill?.message);
+  collect(bill?.error);
+  collect(bill?.error_msg);
+  collect(bill?.error_message);
+  collect(bill?.notice);
+  collect(bill?.reason);
+  if (bill?.can_pay === false && !messages.length) {
+    pushMessage(firstNonNull(bill?.payment_error, bill?.reject_reason, bill?.status_message, "Selldone says this basket cannot be paid yet."));
+  }
+  return messages.slice(0, 4);
+}
+
+function checkoutLineItem(entry = {}) {
+  const item = entry.item || {};
+  const variant = entry.variant || null;
+  const qty = Math.max(1, toInteger(entry.qty, 1) || 1);
+  const linePrice = toNumber(entry.linePrice, item.price || 0);
+  const productHref = `#product/${encodeURIComponent(String(item.id || entry.productId || ""))}`;
+  const activeMedia = variantPrimaryImage(variant) || item.image;
+  const currency = firstNonNull(item.currency, "$");
+  const variantText = variant ? variantLabel(variant, variant.__index || 0) : "";
+  return `
+    <article class="checkout-line-item">
+      <a class="checkout-line-media checkout-line-link" href="${productHref}" aria-label="${escapeHtml(item.title || "Product")}">
+        ${renderProductImage(item, "thumbnail-sprite", activeMedia)}
+      </a>
+      <div>
+        <h4><a class="checkout-title-link" href="${productHref}">${escapeHtml(item.title || "Product")}</a></h4>
+        ${variantText ? `<p>${escapeHtml(variantText)}</p>` : ""}
+        <p>${escapeHtml(`${qty} ${qty === 1 ? "item" : "items"}`)}</p>
+      </div>
+      <div class="checkout-line-pricing">
+        <span>${escapeHtml(`${qty} x ${formatPrice(linePrice, currency)}`)}</span>
+        <strong>${formatPrice(linePrice * qty, currency)}</strong>
+      </div>
+    </article>
+  `;
+}
+
+function submitRedirectForm(url, method = "POST", fields = {}) {
+  const target = String(url || "").trim();
+  if (!target) return;
+  const form = document.createElement("form");
+  form.method = String(method || "POST").toUpperCase() === "GET" ? "GET" : "POST";
+  form.action = target;
+  form.style.display = "none";
+  Object.entries(fields && typeof fields === "object" ? fields : {}).forEach(([key, value]) => {
+    if (value === undefined || value === null) return;
+    const input = document.createElement("input");
+    input.type = "hidden";
+    input.name = key;
+    input.value = typeof value === "string" ? value : JSON.stringify(value);
+    form.appendChild(input);
+  });
+  document.body.appendChild(form);
+  form.submit();
+}
+
 async function renderCheckoutPage() {
+  await ensureProductsForPage();
   if (state.sessionAuthenticated) {
     await hydrateStorefrontCart(true);
   }
@@ -2655,13 +2769,13 @@ async function handleCheckoutSubmit(event) {
       throw new Error(extractStorefrontErrorMessage(result, response?.status || 0));
     }
 
+    if (await handleStripeCheckoutResult(result, payload)) return;
+
     if (result.redirect?.url) {
       showToast("Redirecting to payment...");
       submitRedirectForm(result.redirect.url, result.redirect.method, result.redirect.fields);
       return;
     }
-
-    if (await handleStripeCheckoutResult(result, payload)) return;
 
     if (result.pending) {
       showToast("Payment is pending. Please complete it in Selldone.");
@@ -3084,6 +3198,19 @@ async function resolveCartLineVariantForStorefront(item, variantKey = "") {
 function firstArrayValue(...values) {
   return values.find((value) => Array.isArray(value)) || [];
 }
+
+const {
+  checkoutSubmitLabel,
+  handleStripeCheckoutResult,
+  renderCheckoutPaymentOptions,
+} = createStorefrontPayments({
+  state,
+  firstArrayValue,
+  firstNonNull,
+  escapeHtml,
+  showToast,
+  renderLiveCatalogEmptyState,
+});
 
 function variantKeyFromBasketLine(line = {}, item = null) {
   const variants = getItemVariants(item);

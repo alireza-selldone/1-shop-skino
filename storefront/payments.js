@@ -172,12 +172,67 @@ export function createStorefrontPayments({
   function findStripeCheckoutSessionId(result = {}) {
     const direct = findPaymentValue(result, ["session_id", "sessionId", "stripe_session_id", "stripeSessionId", "checkout_session_id", "checkoutSessionId"]);
     if (direct) return direct;
+    const fromUrl = stripeUrlParam(findStripeRedirectUrl(result), ["session_id", "sessionId", "checkout_session_id", "checkoutSessionId"]);
+    if (fromUrl) return fromUrl;
     const anyId = findPaymentValue(result, ["id"]);
     return anyId.startsWith("cs_") ? anyId : "";
   }
 
   function findStripeClientSecret(result = {}) {
-    return findPaymentValue(result, ["client_secret", "clientSecret", "payment_intent_client_secret", "paymentIntentClientSecret", "stripe_client_secret", "stripeClientSecret"]);
+    return findPaymentValue(result, ["client_secret", "clientSecret", "payment_intent_client_secret", "paymentIntentClientSecret", "stripe_client_secret", "stripeClientSecret"])
+      || stripeUrlParam(findStripeRedirectUrl(result), ["client_secret", "clientSecret", "payment_intent_client_secret", "paymentIntentClientSecret"]);
+  }
+
+  function stripeUrlParam(rawUrl = "", names = []) {
+    const value = String(rawUrl || "").trim();
+    if (!value) return "";
+    try {
+      const url = new URL(value, window.location.origin);
+      for (const name of names) {
+        const found = url.searchParams.get(name);
+        if (found) return found.trim();
+      }
+    } catch {
+      return "";
+    }
+    return "";
+  }
+
+  function findStripeRedirectUrl(result = {}, depth = 0, visited = new WeakSet()) {
+    if (!result || depth > 5) return "";
+    if (typeof result === "string") {
+      const value = result.trim();
+      return /[?&](client_secret|session_id|checkout_session_id)=/i.test(value) ? value : "";
+    }
+    if (typeof result !== "object" || visited.has(result)) return "";
+    visited.add(result);
+
+    const direct = firstNonNull(
+      result?.redirect?.url,
+      result?.redirect_url,
+      result?.redirectUrl,
+      result?.payment_url,
+      result?.paymentUrl,
+      result?.checkout_url,
+      result?.checkoutUrl,
+      result?.url,
+      result?.link,
+      result?.payment?.redirect?.url,
+      result?.payment?.redirect_url,
+      result?.payment?.url,
+      result?.payment?.link,
+      result?.gateway?.redirect?.url,
+      result?.gateway?.url,
+      "",
+    );
+    const directMatch = findStripeRedirectUrl(direct, depth + 1, visited);
+    if (directMatch) return directMatch;
+
+    for (const value of Object.values(result)) {
+      const nested = findStripeRedirectUrl(value, depth + 1, visited);
+      if (nested) return nested;
+    }
+    return "";
   }
 
   function stripePublishableKeyForResult(result = {}, fallbackGatewayCode = "") {
@@ -198,13 +253,26 @@ export function createStorefrontPayments({
 
   async function handleStripeCheckoutResult(result = {}, requestPayload = {}) {
     const gatewayCode = String(firstNonNull(result.gatewayCode, requestPayload.gateway_code, state.checkoutGatewayCode, "") || "").trim();
-    const isStripe = Boolean(result?.stripe) || Boolean(result?.gateway?.stripe) || checkoutGatewayIsStripe(gatewayCode);
+    const sessionId = findStripeCheckoutSessionId(result);
+    const clientSecret = findStripeClientSecret(result);
+    const isStripe = Boolean(clientSecret)
+      || Boolean(sessionId)
+      || Boolean(result?.stripe)
+      || Boolean(result?.gateway?.stripe)
+      || checkoutGatewayIsStripe(gatewayCode);
     if (!isStripe) return false;
 
     const publishableKey = stripePublishableKeyForResult(result, gatewayCode);
-    const sessionId = findStripeCheckoutSessionId(result);
-    const clientSecret = findStripeClientSecret(result);
     if (!publishableKey || (!sessionId && !clientSecret)) return false;
+
+    if (clientSecret) {
+      return renderInlineStripePaymentForm({
+        clientSecret,
+        publishableKey,
+        result,
+        requestPayload,
+      });
+    }
 
     state.stripeLoading = true;
     showToast("Opening Stripe payment...");
@@ -228,6 +296,113 @@ export function createStorefrontPayments({
     }
 
     return false;
+  }
+
+  async function renderInlineStripePaymentForm({ clientSecret, publishableKey, result = {}, requestPayload = {} }) {
+    state.checkoutSubmitting = false;
+    state.stripeLoading = true;
+    const app = document.getElementById("app");
+    if (!app) return false;
+
+    const returnUrl = `${window.location.origin}${window.location.pathname}${window.location.search || ""}#account/orders`;
+    app.innerHTML = `
+      <div class="page-shell">
+        <nav class="breadcrumbs" aria-label="Payment path">
+          <a href="#checkout">Checkout</a><span>/</span><strong>Secure payment</strong>
+        </nav>
+        <section class="section stripe-payment-page">
+          <div class="stripe-payment-shell">
+            <div class="stripe-payment-copy">
+              <span class="account-profile-kicker">Stripe payment</span>
+              <h1>Complete payment securely</h1>
+              <p>Your order is prepared in Selldone. Finish the card payment here without leaving Pajulina.</p>
+              <div class="stripe-payment-badges">
+                <span>Encrypted</span>
+                <span>Stripe</span>
+                <span>Selldone order</span>
+              </div>
+            </div>
+            <form class="stripe-payment-card" data-stripe-payment-form>
+              <div class="stripe-payment-element" data-stripe-payment-element></div>
+              <p class="stripe-payment-message" data-stripe-payment-message role="alert"></p>
+              <button class="black-button stripe-payment-submit" type="submit" data-stripe-payment-submit>
+                Pay securely
+              </button>
+              <a class="text-link" href="#checkout">Back to checkout</a>
+            </form>
+          </div>
+        </section>
+      </div>
+    `;
+
+    showToast("Loading secure Stripe form...");
+    const Stripe = await loadStripeJs();
+    const stripe = Stripe(publishableKey);
+
+    if (clientSecret.startsWith("cs_") && typeof stripe.initEmbeddedCheckout === "function") {
+      const checkout = await stripe.initEmbeddedCheckout({ clientSecret });
+      checkout.mount("[data-stripe-payment-element]");
+      state.stripeLoading = false;
+      return true;
+    }
+
+    const elements = stripe.elements({
+      clientSecret,
+      appearance: {
+        theme: "stripe",
+        variables: {
+          colorPrimary: "#1f8f3a",
+          colorText: "#1d1d1f",
+          colorDanger: "#b00020",
+          borderRadius: "12px",
+          fontFamily: "Arial, sans-serif",
+        },
+      },
+    });
+    const paymentElement = elements.create("payment", { layout: "tabs" });
+    paymentElement.mount("[data-stripe-payment-element]");
+
+    const form = app.querySelector("[data-stripe-payment-form]");
+    const submit = app.querySelector("[data-stripe-payment-submit]");
+    const message = app.querySelector("[data-stripe-payment-message]");
+    form?.addEventListener("submit", async (event) => {
+      event.preventDefault();
+      if (submit) {
+        submit.disabled = true;
+        submit.textContent = "Processing payment...";
+      }
+      if (message) message.textContent = "";
+
+      const { error, paymentIntent } = await stripe.confirmPayment({
+        elements,
+        confirmParams: {
+          return_url: returnUrl,
+        },
+        redirect: "if_required",
+      });
+
+      if (error) {
+        if (message) message.textContent = error.message || "Stripe payment failed.";
+        showToast(error.message || "Stripe payment failed.");
+        if (submit) {
+          submit.disabled = false;
+          submit.textContent = "Pay securely";
+        }
+        return;
+      }
+
+      const status = paymentIntent?.status || "processing";
+      showToast(`Stripe payment ${status}.`);
+      renderLiveCatalogEmptyState(
+        status === "succeeded" ? "Payment completed" : "Payment processing",
+        status === "succeeded"
+          ? "Stripe confirmed the payment. Your Selldone order history will update shortly."
+          : "Stripe accepted the payment step. Selldone will confirm the order shortly.",
+      );
+    });
+
+    state.stripeLoading = false;
+    return true;
   }
 
   return {

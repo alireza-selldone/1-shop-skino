@@ -16,12 +16,47 @@ function profileCartProduct(entry = {}, firstNonNull) {
   };
 }
 
+function profileCartImage(entry = {}, firstNonNull) {
+  const source = entry?.item && typeof entry.item === "object" ? entry.item : entry;
+  const product = source?.product && typeof source.product === "object" ? source.product : {};
+  const images = [
+    entry?.image,
+    entry?.photo,
+    entry?.icon,
+    source?.image,
+    source?.photo,
+    source?.icon,
+    source?.thumbnail,
+    product.image,
+    product.photo,
+    product.icon,
+    product.thumbnail,
+    Array.isArray(source?.images) ? source.images[0] : null,
+    Array.isArray(product?.images) ? product.images[0] : null,
+    Array.isArray(source?.gallery) ? source.gallery[0] : null,
+    Array.isArray(product?.gallery) ? product.gallery[0] : null,
+  ];
+  const candidate = firstNonNull(...images);
+  if (!candidate) return "";
+  if (typeof candidate === "string") return candidate.trim();
+  if (candidate && typeof candidate === "object") {
+    return String(firstNonNull(candidate.url, candidate.src, candidate.path, candidate.image, candidate.photo, "") || "").trim();
+  }
+  return "";
+}
+
 function renderCartPreview(entries = [], escapeHtml, firstNonNull) {
   return entries.slice(0, 4).map((entry) => {
     const item = profileCartProduct(entry, firstNonNull);
+    const image = profileCartImage(entry, firstNonNull);
     return `
       <a class="account-profile-cart-line" href="${escapeHtml(item.href)}">
-        <span>${escapeHtml(item.title)}</span>
+        <span class="account-profile-cart-product">
+          <span class="account-profile-cart-thumb" aria-hidden="true">
+            ${image ? `<img src="${escapeHtml(image)}" alt="" loading="lazy" />` : `<span>${escapeHtml(item.title.slice(0, 1).toUpperCase() || "P")}</span>`}
+          </span>
+          <span class="account-profile-cart-title">${escapeHtml(item.title)}</span>
+        </span>
         <strong>${escapeHtml(`x${item.quantity}`)}</strong>
       </a>
     `;
@@ -139,7 +174,7 @@ export async function renderAccountProfileOverviewPage(deps) {
                       </div>
                       <div class="account-profile-cart-preview">
                         ${profileCartPreview}
-                        ${profileCartEntries.length > 4 ? `<a class="account-profile-cart-line account-profile-cart-line--more" href="#cart"><span>More items</span><strong>+${profileCartEntries.length - 4}</strong></a>` : ""}
+                        ${profileCartEntries.length > 4 ? `<a class="account-profile-cart-line account-profile-cart-line--more" href="#cart"><span class="account-profile-cart-title">More items</span><strong>+${profileCartEntries.length - 4}</strong></a>` : ""}
                       </div>
                     `
                     : `
