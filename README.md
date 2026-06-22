@@ -19,7 +19,6 @@ There is no production Node server. The local Node script is only a development 
 - `shared/` - shared browser modules used by storefront, dashboard, and callback
 - `scripts/build-static.mjs` - creates Cloudflare Pages output in `dist/`
 - `scripts/dev-static.mjs` - local static file server for development only
-- `.github/workflows/cloudflare-pages.yml` - optional GitHub Actions deploy to Cloudflare Pages
 - `wrangler.toml` - Cloudflare Workers Static Assets config
 
 ## Runtime configuration
@@ -86,19 +85,15 @@ Cloudflare Workers Builds settings:
 - OAuth authorize/token calls use `https://selldone.com/oauth` with public-client PKCE.
 - Storefront and dashboard tokens are stored separately in browser localStorage.
 
-## Deploy from GitHub
+## Deploy from GitHub through Cloudflare
 
-The included workflow builds `dist/` and deploys the Worker with Wrangler. Required GitHub secrets:
-
-```text
-CLOUDFLARE_ACCOUNT_ID
-CLOUDFLARE_API_TOKEN
-```
-
-Required GitHub variable:
+Use Cloudflare Workers Builds connected to this GitHub repository. The Cloudflare build form should use:
 
 ```text
-CLOUDFLARE_PAGES_PROJECT=selldone-shop-a1
+Build command: npm run build:static
+Deploy command: npx wrangler deploy
+Non-production branch deploy command: npx wrangler versions upload
+Path: /
 ```
 
-See `docs/github-cloudflare-action.md` and `docs/static-cloudflare-pages.md`.
+See `docs/static-cloudflare-pages.md`.
