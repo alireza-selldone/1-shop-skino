@@ -1,17 +1,17 @@
 :root {
   color-scheme: light;
   --ink: #111111;
-  --muted: #6c625e;
-  --soft: #f3f8e9;
-  --soft-2: #fbf8dc;
-  --line: #e3ebcf;
-  --hot: #1f8f3a;
-  --hot-2: #7ecf45;
-  --orange: #e4b900;
-  --blue: #c9e873;
-  --teal: #2aa36b;
-  --green: #1f8f3a;
-  --gold: #c29b00;
+  --muted: #6f625a;
+  --soft: #f7f2ed;
+  --soft-2: #efe4d8;
+  --line: #e2d7ce;
+  --hot: #5b341f;
+  --hot-2: #8b5e3c;
+  --orange: #8b5e3c;
+  --blue: #d8c6b6;
+  --teal: #3a2a22;
+  --green: #5b341f;
+  --gold: #b08a6a;
   --page: 1060px;
   --radius: 8px;
   --font: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
@@ -1520,7 +1520,7 @@ img.large-sprite {
   align-items: stretch;
   padding: 12px;
   border-radius: var(--radius);
-  background: #1f8f3a;
+  background: #5b341f;
   color: #ffffff;
 }
 
@@ -5699,9 +5699,9 @@ img.large-sprite {
   border: 1px solid rgba(29, 29, 31, 0.08);
   border-radius: 10px;
   background:
-    radial-gradient(circle at 24% 24%, rgba(31, 143, 58, 0.16), transparent 34%),
+    radial-gradient(circle at 24% 24%, rgba(91, 52, 31, 0.16), transparent 34%),
     #ffffff;
-  color: #1f8f3a;
+  color: #5b341f;
   font-size: 0.78rem;
   font-weight: 900;
 }
@@ -5883,7 +5883,7 @@ img.large-sprite {
 .promo-card--membership {
   background:
     radial-gradient(circle at 80% 16%, rgba(255, 255, 255, 0.2), transparent 30%),
-    linear-gradient(135deg, #17833a 0%, #4fb53f 100%);
+    linear-gradient(135deg, #111111 0%, #5b341f 100%);
 }
 
 .promo-card--membership .promo-body {
@@ -5934,8 +5934,8 @@ img.large-sprite {
   border: 1px solid rgba(255, 255, 255, 0.72);
   border-radius: 999px;
   background: rgba(255, 255, 255, 0.96);
-  color: #08752f;
-  box-shadow: 0 16px 36px rgba(11, 69, 28, 0.18);
+  color: #5b341f;
+  box-shadow: 0 16px 36px rgba(91, 52, 31, 0.18);
 }
 
 .promo-card--membership .promo-discs strong,
@@ -5998,7 +5998,7 @@ img.large-sprite {
 }
 
 .promo-card--image .eyebrow {
-  color: #0c8837;
+  color: #5b341f;
 }
 
 .promo-card--image h2 {
@@ -6020,9 +6020,9 @@ img.large-sprite {
   width: fit-content;
   min-width: 124px;
   justify-content: center;
-  background: #0f913c;
+  background: #111111;
   color: #ffffff;
-  box-shadow: 0 14px 28px rgba(15, 145, 60, 0.22);
+  box-shadow: 0 14px 28px rgba(17, 17, 17, 0.18);
 }
 
 .promo-card--summer::after {
@@ -6074,9 +6074,9 @@ img.large-sprite {
   padding: 0 22px;
   border: 0;
   border-radius: 999px;
-  background: linear-gradient(135deg, #1f8f3a, #b8d600);
+  background: linear-gradient(135deg, #111111, #5b341f);
   color: #ffffff;
-  box-shadow: 0 14px 30px rgba(31, 143, 58, 0.22);
+  box-shadow: 0 14px 30px rgba(91, 52, 31, 0.22);
   cursor: pointer;
   font-size: 13px;
   font-weight: 850;
@@ -6085,17 +6085,17 @@ img.large-sprite {
 }
 
 .quick-buy-trigger:hover {
-  box-shadow: 0 18px 38px rgba(31, 143, 58, 0.28);
+  box-shadow: 0 18px 38px rgba(91, 52, 31, 0.26);
   transform: translateY(-1px);
 }
 
 .quick-buy-panel {
   margin: 18px 0;
   overflow: hidden;
-  border: 1px solid rgba(31, 143, 58, 0.18);
+  border: 1px solid rgba(91, 52, 31, 0.18);
   border-radius: 24px;
   background:
-    radial-gradient(circle at 8% 0%, rgba(184, 214, 0, 0.18), transparent 32%),
+    radial-gradient(circle at 8% 0%, rgba(176, 138, 106, 0.18), transparent 32%),
     linear-gradient(135deg, #ffffff 0%, #fbfff2 48%, #f7fbff 100%);
   box-shadow: 0 28px 70px rgba(29, 29, 31, 0.1);
 }
@@ -6318,7 +6318,7 @@ img.large-sprite {
   display: inline-flex;
   justify-content: center;
   grid-column: 1 / -1;
-  color: #1f8f3a;
+  color: #5b341f;
   font-size: 0.78rem;
   font-weight: 900;
 }
@@ -6347,9 +6347,9 @@ img.large-sprite {
 }
 
 .quick-buy-address-options button.is-active {
-  border-color: rgba(31, 143, 58, 0.38);
-  background: #effbdd;
-  color: #1f8f3a;
+  border-color: rgba(91, 52, 31, 0.38);
+  background: #efe4d8;
+  color: #5b341f;
 }
 
 .quick-buy-address-form {
@@ -6395,9 +6395,9 @@ img.large-sprite {
   padding: 0 20px;
   border: 0;
   border-radius: 999px;
-  background: linear-gradient(135deg, #111111 0%, #1f8f3a 100%);
+  background: linear-gradient(135deg, #111111 0%, #5b341f 100%);
   color: #ffffff;
-  box-shadow: 0 18px 38px rgba(31, 143, 58, 0.26);
+  box-shadow: 0 18px 38px rgba(91, 52, 31, 0.26);
   cursor: pointer;
   font-weight: 900;
 }
@@ -6467,7 +6467,7 @@ img.large-sprite {
 
 .quick-buy-billing-row em {
   font-style: normal;
-  color: #1f8f3a;
+  color: #5b341f;
   font-weight: 800;
 }
 
@@ -7274,7 +7274,7 @@ body.quick-buy-open {
 }
 
 .product-article-content blockquote {
-  border-left: 3px solid #1f8f3a;
+  border-left: 3px solid #5b341f;
   padding-left: 14px;
   color: #5f5a51;
 }
@@ -7371,4 +7371,192 @@ body.quick-buy-open {
 .product-detail-layout + .product-article-section .product-article-content figure,
 .product-detail-layout + .product-article-section .product-article-content .medium-insert-images {
   max-width: 100%;
+}
+
+/* Skino black, brown, white theme */
+body {
+  background: #ffffff;
+}
+
+.page-loading-bar {
+  background: linear-gradient(90deg, rgba(17, 17, 17, 0.08), rgba(91, 52, 31, 0.12), rgba(176, 138, 106, 0.1));
+}
+
+.page-loading-bar span {
+  background: linear-gradient(90deg, transparent 0%, rgba(17, 17, 17, 0.75) 18%, rgba(91, 52, 31, 0.95) 52%, rgba(176, 138, 106, 0.82) 82%, transparent 100%);
+  filter: drop-shadow(0 0 10px rgba(91, 52, 31, 0.2));
+}
+
+.site-header,
+.main-nav,
+.account-menu,
+.cart-panel,
+.category-menu-panel,
+.product-card,
+.blog-card,
+.order-success-card,
+.product-article-section {
+  background: #ffffff;
+}
+
+.site-header,
+.utility-bar,
+.main-nav,
+.shop-toolbar,
+.footer-bottom,
+.cart-head,
+.cart-summary,
+.product-article-content table,
+.product-article-content th,
+.product-article-content td {
+  border-color: var(--line);
+}
+
+.utility-inner,
+.search-form input::placeholder,
+.product-article-content,
+.routine-step p s {
+  color: var(--muted);
+}
+
+.brand-mark,
+.utility-inner a:hover,
+.primary-links a:hover,
+.account-profile-panel--minimal .account-profile-head a,
+.product-article-content a,
+.routine-step p em,
+.product-card-price,
+.blog-card-media--fallback,
+.footer-pitch h2 {
+  color: var(--hot);
+}
+
+.brand-mark span {
+  border-color: var(--hot);
+}
+
+.search-form {
+  border-bottom-color: #3a2a22;
+}
+
+.primary-links a.is-active {
+  border-color: #111111;
+}
+
+.hero-slide,
+.home-blog-band,
+.promo-strip,
+.shop-hero,
+.account-profile-hero,
+.order-success-countdown,
+.quick-buy-mini-cart-variant-details div,
+.product-article-content th,
+.cart-item-media,
+.category-card,
+.signup-card {
+  background: var(--soft);
+}
+
+.promo-card--membership,
+.floating-help,
+.cart-count,
+.pill-button,
+.black-button,
+.add-button,
+.cart-summary button,
+.signup-card button,
+.newsletter-form button,
+.account-profile-actions--top .black-button,
+.promo-grid--editorial .pill-button,
+.promo-card--image .pill-button,
+.checkout-submit,
+.quick-buy-submit,
+.order-success-icon {
+  border-color: #111111;
+  background: #111111;
+  color: #ffffff;
+}
+
+.pill-button:hover,
+.black-button:hover,
+.add-button:hover,
+.cart-summary button:hover,
+.signup-card button:hover,
+.promo-card--image .pill-button:hover {
+  background: #5b341f;
+  border-color: #5b341f;
+  color: #ffffff;
+}
+
+.promo-card--membership {
+  background: linear-gradient(135deg, #111111 0%, #5b341f 100%);
+}
+
+.promo-card--membership .promo-discs span,
+.home-feature-card,
+.checkout-status,
+.cart-status,
+.product-option-note,
+.product-detail-note {
+  border-color: #d8c6b6;
+  background: #f8f4f0;
+  color: #3a2a22;
+}
+
+.promo-card--image,
+.product-card-media,
+.thumbnail-sprite,
+.blog-card-media--fallback,
+.category-menu-list a,
+.variant-option-button.is-active,
+.product-article-content table {
+  background: #ffffff;
+}
+
+.promo-card--image .eyebrow,
+.section-eyebrow,
+.product-card-badge,
+.product-meta,
+.product-rating-summary strong,
+.footer-bottom a:hover {
+  color: #5b341f;
+}
+
+.product-card-badge,
+.sale-badge,
+.routine-step p em {
+  background: #efe4d8;
+}
+
+.product-article-content blockquote {
+  border-left-color: #5b341f;
+}
+
+.rating-bar span,
+.account-order-status-line span,
+.order-detail-progress span {
+  background: #5b341f;
+}
+
+.footer-bottom,
+.site-footer {
+  background: #111111;
+  color: #ffffff;
+}
+
+.site-footer a,
+.site-footer p,
+.site-footer h3,
+.footer-bottom span,
+.footer-bottom a {
+  color: rgba(255, 255, 255, 0.78);
+}
+
+.site-footer h2,
+.site-footer strong {
+  color: #ffffff;
+}
+
+.signup-card {
+  color: #111111;
 }

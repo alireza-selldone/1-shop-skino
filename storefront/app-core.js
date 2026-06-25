@@ -32,7 +32,7 @@ const heroSlides = [
   {
     image: "assets/cosmetic-hero-ritual.png",
     position: "50% 50%",
-    accent: "#1f8f3a",
+    accent: "#5b341f",
     eyebrow: "Skino cosmetic shop",
     title: "Glow rituals, edited beautifully",
     body: "Fresh skin care, soft color, and everyday essentials curated for a clean routine.",
@@ -42,7 +42,7 @@ const heroSlides = [
   {
     image: "assets/cosmetic-hero-discounts.png",
     position: "58% 50%",
-    accent: "#e4b900",
+    accent: "#8b5e3c",
     eyebrow: "Member beauty deals",
     title: "Save on the icons in your routine",
     body: "Discounted beauty finds with premium skin, makeup, and gifting picks in one edit.",
@@ -52,7 +52,7 @@ const heroSlides = [
   {
     image: "assets/cosmetic-hero-routine.png",
     position: "54% 50%",
-    accent: "#2aa36b",
+    accent: "#111111",
     eyebrow: "Routine order",
     title: "Cream pots first, eye essentials last",
     body: "Start with skin-focused jars, move into tubes, then finish with refined eye products.",
