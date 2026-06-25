@@ -141,7 +141,7 @@ export function renderHomePage(deps) {
         <div class="section-head">
           <div>
             <h2>Shop by category</h2>
-            <p>Explore Pajulina Beauty categories with their storefront images.</p>
+            <p>Explore Skino Beauty categories with their storefront images.</p>
           </div>
         </div>
         <div class="category-grid category-grid--home">
@@ -155,7 +155,7 @@ export function renderHomePage(deps) {
         <div class="gift-banner">
           <div class="gift-copy">
             <h2>Find a gift Dad will love</h2>
-            <p>Ask Pajulina AI for personalized picks, from skin care to fragrance.</p>
+            <p>Ask Skino AI for personalized picks, from skin care to fragrance.</p>
             <a class="text-link" href="#shop?category=gifts">Start chat</a>
           </div>
           <div class="gift-image" role="img" aria-label="Beauty gifts and cosmetics"></div>
@@ -181,7 +181,7 @@ export function renderHomePage(deps) {
         <div class="coupon-band">
           <div>
             <strong>20% off your first purchase</strong>
-            <span>When you sign up for Pajulina emails. Exclusions apply.</span>
+            <span>When you sign up for Skino emails. Exclusions apply.</span>
           </div>
           <a class="text-link" href="#shop">See details</a>
         </div>
@@ -189,13 +189,13 @@ export function renderHomePage(deps) {
 
       <section class="section">
         <div class="section-head">
-          <h2>All things Pajulina Beauty</h2>
+          <h2>All things Skino Beauty</h2>
         </div>
         <div class="magazine-row">
           ${storyCard("Pride, Amplified", "Joyful color made for every day.", "50% 50%", true, magazineImages.pride)}
           ${storyCard("Apply to be a part of the 2026 Muse cohort", "Creators, artists, and beauty voices.", "50% 50%", true, magazineImages.muse)}
-          ${storyCard("Join the Pajulina Beauty Community today", "Tips, events, and new favorites.", "50% 50%", true, magazineImages.community)}
-          ${storyCard("Give a Pajulina Beauty gift card", "The easiest gift for every routine.", "50% 50%", true, magazineImages.giftCard)}
+          ${storyCard("Join the Skino Beauty Community today", "Tips, events, and new favorites.", "50% 50%", true, magazineImages.community)}
+          ${storyCard("Give a Skino Beauty gift card", "The easiest gift for every routine.", "50% 50%", true, magazineImages.giftCard)}
         </div>
       </section>
     </div>

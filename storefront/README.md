@@ -1,6 +1,6 @@
-# Pajulina Storefront
+# Skino Storefront
 
-Static English storefront for Pajulina Beauty.
+Static English storefront for Skino Beauty.
 
 Open it through the repository static dev server, not `file://`, so ES modules, OAuth callback routing, and browser-direct Selldone XAPI calls use a real origin.
 

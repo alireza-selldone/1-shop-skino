@@ -49,7 +49,7 @@ const {
   normalizeGallery,
 } = storefront;
 
-const favoriteStorageKey = "pajulina:favorites";
+const favoriteStorageKey = "skino:favorites";
 
 function readFavoriteIds() {
   try {
@@ -500,7 +500,7 @@ export function registerStorefrontInteractions() {
   });
 
   const newsletterForm = document.querySelector("[data-newsletter-form]");
-  const newsletterStorageKey = "pajulina:newsletter-email";
+  const newsletterStorageKey = "skino:newsletter-email";
   const showNewsletterSubscribedState = (form, email = "") => {
     const message = form.querySelector("[data-newsletter-message]");
     form.classList.add("is-subscribed");

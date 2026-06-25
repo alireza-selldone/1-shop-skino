@@ -267,7 +267,7 @@ function renderShippingFallback({ transportations }) {
 
 function renderProfilePageShell(pageKey, profileData, content) {
   const meta = PROFILE_PAGE_META[pageKey];
-  const shopName = profileData.shop?.title || profileData.shop?.name || "Pajulina";
+  const shopName = profileData.shop?.title || profileData.shop?.name || "Skino";
   return `
     <section class="profile-page page-shell">
       <nav class="profile-breadcrumb" aria-label="Breadcrumb">

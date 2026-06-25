@@ -465,7 +465,7 @@ export function createStorefrontQuickBuy(deps) {
           <div class="quick-buy-primary-item">
             <div class="quick-buy-product-media">${renderProductImage(item, "thumbnail-sprite", firstNonNull(selected?.image, selected?.icon, selected?.path, item.image, item.images?.[0]))}</div>
             <div>
-              <span>${escapeHtml(item.brand || "Pajulina")}</span>
+              <span>${escapeHtml(item.brand || "Skino")}</span>
               <h3>${escapeHtml(item.title || "Product")}</h3>
               <p>${selected ? escapeHtml(firstNonNull(selected.title, selected.name, selected.sku, selected.code, "")) : "Selected product"}</p>
               ${renderVariantSummary(selected, "cart-variant-details quick-buy-cart-variant-details")}
@@ -749,7 +749,7 @@ export function createStorefrontQuickBuy(deps) {
             await completeStorefrontOrder(fallbackResult, requestPayload);
             return;
           }
-          renderLiveCatalogEmptyState("Order placed", "Your quick order has been received. Thank you for shopping with Pajulina.");
+          renderLiveCatalogEmptyState("Order placed", "Your quick order has been received. Thank you for shopping with Skino.");
           return;
         }
         throw new Error(result?.error || result?.message || `Quick buy failed (${response.status}).`);
@@ -767,7 +767,7 @@ export function createStorefrontQuickBuy(deps) {
         await completeStorefrontOrder(result, requestPayload);
         return;
       }
-      renderLiveCatalogEmptyState("Order placed", "Your quick order has been received. Thank you for shopping with Pajulina.");
+      renderLiveCatalogEmptyState("Order placed", "Your quick order has been received. Thank you for shopping with Skino.");
     } catch (error) {
       state.quickBuy = { ...(state.quickBuy || {}), submitting: false };
       if (submit) {

@@ -24,8 +24,8 @@ This project is a fully static Selldone storefront plus browser-side dashboard. 
 - Dashboard/backoffice calls must go browser-direct to `https://api.selldone.com`.
 - OAuth must use public-client PKCE against `https://selldone.com/oauth`; never use a client secret.
 - Storefront and dashboard OAuth tokens must stay separate in localStorage:
-  - `pajulina_storefront_oauth_tokens_v1`
-  - `pajulina_dashboard_oauth_tokens_v1`
+  - `skino_storefront_oauth_tokens_v1`
+  - `skino_dashboard_oauth_tokens_v1`
 - Do not add Node-only API routes for production features.
 - Existing storefront `/api/storefront/*` calls are browser-intercepted by `storefront/static-storefront-api.js` and translated to real XAPI requests.
 - Storefront order history is physical-only and loads from XAPI `GET /shops/@{shop}/basket/orders-PHYSICAL` with the `order-history` scope.
@@ -39,7 +39,7 @@ This project is a fully static Selldone storefront plus browser-side dashboard. 
 
 - Use the central Selldone image helpers where present.
 - Do not create local one-off image resolvers in feature files.
-- Selldone underscore paths must be converted consistently, for example `shops_14952_products_demo` -> `https://cdn.selldone.com/app/shops/14952/products/demo128.png`.
+- Selldone underscore paths must be converted consistently, for example `shops_14261_products_demo` -> `https://cdn.selldone.com/app/shops/14261/products/demo128.png`.
 
 ## Dashboard Code Organization
 

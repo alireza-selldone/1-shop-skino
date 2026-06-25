@@ -16,9 +16,9 @@ import { storefrontAuth } from "/shared/auth-client.js";
 
 const SPRITE_COLUMNS = 4;
 const SPRITE_ROWS = 4;
-const CART_KEY = "pajulina_storefront_cart_v1";
-const STOREFRONT_ACCESS_TOKEN_KEY = "pajulina_storefront_access_token";
-const STOREFRONT_TOKEN_EXPIRES_AT_KEY = "pajulina_storefront_access_token_expires_at";
+const CART_KEY = "skino_storefront_cart_v1";
+const STOREFRONT_ACCESS_TOKEN_KEY = "skino_storefront_access_token";
+const STOREFRONT_TOKEN_EXPIRES_AT_KEY = "skino_storefront_access_token_expires_at";
 const DATA_SOURCE = {
   xapi: "xapi",
 };
@@ -33,7 +33,7 @@ const heroSlides = [
     image: "assets/cosmetic-hero-ritual.png",
     position: "50% 50%",
     accent: "#1f8f3a",
-    eyebrow: "Pajulina cosmetic shop",
+    eyebrow: "Skino cosmetic shop",
     title: "Glow rituals, edited beautifully",
     body: "Fresh skin care, soft color, and everyday essentials curated for a clean routine.",
     cta: "Shop skin care",
@@ -210,9 +210,9 @@ function shouldTrackFetch(input) {
 }
 
 function installPageLoadingFetchTracker() {
-  if (window.__pajulinaPageLoadingFetchTracker) return;
+  if (window.__skinoPageLoadingFetchTracker) return;
   const nativeFetch = window.fetch.bind(window);
-  window.__pajulinaPageLoadingFetchTracker = true;
+  window.__skinoPageLoadingFetchTracker = true;
   window.fetch = async (...args) => {
     const tracked = shouldTrackFetch(args[0]);
     if (tracked) setPageLoading(true);
@@ -708,7 +708,7 @@ function generateProductPros(product = {}) {
     },
     {
       title: "Details",
-      body: `${category} performance with a curated Pajulina feel: balanced payoff, clean presentation, and packaging suited for daily use or gifting.`,
+      body: `${category} performance with a curated Skino feel: balanced payoff, clean presentation, and packaging suited for daily use or gifting.`,
     },
     {
       title: "How To Use",
@@ -740,7 +740,7 @@ function generateProductPros(product = {}) {
       title: "Shipping & Coupon Restrictions",
       body: pickProsText(
         [
-          "Ships as a physical Pajulina item. Standard shipping, pickup, and eligible promotions apply unless the cart says otherwise.",
+          "Ships as a physical Skino item. Standard shipping, pickup, and eligible promotions apply unless the cart says otherwise.",
           "Available for physical delivery. Some coupons, bundles, or regional shipping methods may be limited at checkout.",
           "Eligible for standard storefront checkout. Final delivery cost and promotion availability are confirmed by Selldone in the cart.",
           "Packed for safe delivery. Shipping options, COD, and discounts are calculated live before payment.",
@@ -1796,7 +1796,7 @@ function mapBlogArticle(raw, index = 0) {
     content,
     image: normalizeBlogImage(raw, index),
     category: categorySource ? String(categorySource).trim() : "Beauty Notes",
-    author: String(author || "Pajulina").trim(),
+    author: String(author || "Skino").trim(),
     createdAt: firstNonNull(raw.created_at, raw.createdAt, raw.published_at, raw.publishedAt, raw.date, ""),
     updatedAt: firstNonNull(raw.updated_at, raw.updatedAt, ""),
     published: !falseyFlag(raw.published),
@@ -1943,7 +1943,7 @@ function renderBlogImage(article, className = "blog-card-media") {
   if (typeof article?.image === "string" && article.image.trim()) {
     return `<div class="${className}"><img src="${escapeHtml(article.image)}" alt="${escapeHtml(article.title || "Blog image")}" loading="lazy" /></div>`;
   }
-  return `<div class="${className} blog-card-media--fallback"><span>Pajulina Notes</span></div>`;
+  return `<div class="${className} blog-card-media--fallback"><span>Skino Notes</span></div>`;
 }
 
 function renderBlogCard(article, options = {}) {
@@ -2014,7 +2014,7 @@ function renderBlogBody(article) {
 
 function blogArticleSummary(article, maxLength = 160) {
   const bodyText = String(extractBlogArticleContent(article) || "").trim();
-  if (!bodyText) return "Read the latest Pajulina storefront update.";
+  if (!bodyText) return "Read the latest Skino storefront update.";
   const plain = bodyText.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim();
   if (plain.length <= maxLength) return plain;
   return `${plain.slice(0, Math.max(0, maxLength)).trim()}...`;
@@ -2048,7 +2048,7 @@ function renderBlogTeaserSection() {
       <div class="section-head">
         <div>
           <h2>Latest beauty notes</h2>
-          <p>Fresh updates, routines, and selling ideas from Pajulina.</p>
+          <p>Fresh updates, routines, and selling ideas from Skino.</p>
         </div>
         <a class="text-link" href="#blog">View all posts</a>
       </div>
@@ -2066,7 +2066,7 @@ function renderHomeBlogImage(article) {
   if (typeof article?.image === "string" && article.image.trim()) {
     return `<img src="${escapeHtml(article.image)}" alt="${escapeHtml(article.title || "Blog image")}" loading="lazy" />`;
   }
-  return `<span class="home-blog-fallback">Pajulina Notes</span>`;
+  return `<span class="home-blog-fallback">Skino Notes</span>`;
 }
 
 function renderHomeBlogTile(article) {
@@ -2096,7 +2096,7 @@ function renderHomeBlogBand() {
     <section class="section" id="journal">
       <div class="home-blog-band ${items.length ? "" : "home-blog-band--empty"}">
         <div class="home-blog-lead">
-          <span class="eyebrow">Pajulina journal</span>
+          <span class="eyebrow">Skino journal</span>
           <h2>Latest beauty notes</h2>
           <p>${items.length ? "Fresh routines, product stories, and store updates from the Selldone blog." : escapeHtml(loadMessage)}</p>
           <a class="pill-button light" href="#blog">${items.length ? "View all posts" : "Open blog"}</a>
@@ -3925,8 +3925,8 @@ function getFilteredProducts() {
 function shopHeading() {
   if (state.search) return `Search results for "${state.search}"`;
   if (state.activeDiscountOnly && (!state.activeCategory || state.activeCategory === "all")) return "Discounted Beauty";
-  if (!state.activeCategory || state.activeCategory === "all") return "Pajulina Beauty";
-  return `${state.activeDiscountOnly ? "Discounted " : ""}${titleCase(state.activeCategory)} at Pajulina`;
+  if (!state.activeCategory || state.activeCategory === "all") return "Skino Beauty";
+  return `${state.activeDiscountOnly ? "Discounted " : ""}${titleCase(state.activeCategory)} at Skino`;
 }
 
 function eventTile(title, body, pos) {
@@ -4054,7 +4054,7 @@ function routineStep(label, item) {
         <span class="routine-step-label">${escapeHtml(label)}</span>
         <h4><a class="routine-step-title-link" href="${href}">${escapeHtml(item.title)}</a></h4>
         <p>
-          ${escapeHtml(item.brand || "Pajulina")} · ${formatPrice(price, item.currency)}
+          ${escapeHtml(item.brand || "Skino")} · ${formatPrice(price, item.currency)}
           ${original && original > price ? `<s>${formatPrice(original, item.currency)}</s>` : ""}
           ${dealLabel ? `<em>${escapeHtml(dealLabel)}</em>` : ""}
         </p>
@@ -4370,7 +4370,7 @@ function firstArrayValue(...values) {
   return values.find((value) => Array.isArray(value)) || [];
 }
 
-const ORDER_SUCCESS_STORAGE_KEY = "pajulina:last-checkout-order";
+const ORDER_SUCCESS_STORAGE_KEY = "skino:last-checkout-order";
 let orderSuccessCountdownTimer = null;
 
 function checkoutResultOrderId(result = {}, requestPayload = {}, paymentIntent = null) {
@@ -5584,10 +5584,10 @@ async function renderShopPage() {
       <section class="shop-hero">
         <div class="shop-hero-copy">
           <span class="eyebrow">Discover the refreshed</span>
-          <h1>Pajulina Beauty Collection</h1>
+          <h1>Skino Beauty Collection</h1>
           <p>Cruelty free beauty with clean ingredients, fresh color, and everyday ease.</p>
         </div>
-        <div class="shop-hero-image" style="--shop-hero-image:url('assets/shop-hero-fresh.png')" role="img" aria-label="Pajulina beauty collection products"></div>
+        <div class="shop-hero-image" style="--shop-hero-image:url('assets/shop-hero-fresh.png')" role="img" aria-label="Skino beauty collection products"></div>
       </section>
 
       <section class="section-tight">

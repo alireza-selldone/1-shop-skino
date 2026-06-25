@@ -6,11 +6,11 @@ const CONTEXTS = {
 };
 
 const TOKEN_KEYS = {
-  [CONTEXTS.DASHBOARD]: "pajulina_dashboard_oauth_tokens_v1",
-  [CONTEXTS.STOREFRONT]: "pajulina_storefront_oauth_tokens_v1",
+  [CONTEXTS.DASHBOARD]: "skino_dashboard_oauth_tokens_v1",
+  [CONTEXTS.STOREFRONT]: "skino_storefront_oauth_tokens_v1",
 };
 
-const STATE_KEY = "pajulina_oauth_state_v1";
+const STATE_KEY = "skino_oauth_state_v1";
 
 export function createAuthClient(context) {
   const safeContext = normalizeContext(context);

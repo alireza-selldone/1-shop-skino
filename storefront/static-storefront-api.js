@@ -1,12 +1,12 @@
-﻿import { storefrontAuth } from "../shared/auth-client.js";
+import { storefrontAuth } from "../shared/auth-client.js";
 import { getPublicConfig } from "../shared/runtime-config.js";
 
 const PHYSICAL_BASKET_TYPE = "physical";
 
 export function installStaticStorefrontApi() {
-  if (window.__pajulinaStaticStorefrontApi) return;
+  if (window.__skinoStaticStorefrontApi) return;
   const nativeFetch = window.fetch.bind(window);
-  window.__pajulinaStaticStorefrontApi = true;
+  window.__skinoStaticStorefrontApi = true;
 
   window.fetch = async (input, init = {}) => {
     const requestUrl = requestToUrl(input);
@@ -766,7 +766,7 @@ function xapiUrl(path) {
 function shopHandle(config = getPublicConfig()) {
   const raw = firstValue(
     config.STOREFRONT_SHOP_HANDLE,
-    readMetaContent("pajulina-storefront-shop-handle"),
+    readMetaContent("skino-storefront-shop-handle"),
     readMetaContent("shop-name"),
   );
   const normalized = String(raw || "").trim().replace(/^@+/, "");

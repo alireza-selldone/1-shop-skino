@@ -321,7 +321,7 @@ export function createStorefrontPayments({
             <div class="stripe-payment-copy">
               <span class="account-profile-kicker">Stripe payment</span>
               <h1>Complete payment securely</h1>
-              <p>Your order is prepared in Selldone. Finish the card payment here without leaving Pajulina.</p>
+              <p>Your order is prepared in Selldone. Finish the card payment here without leaving Skino.</p>
               <div class="stripe-payment-badges">
                 <span>Encrypted</span>
                 <span>Stripe</span>

@@ -202,7 +202,7 @@ export function renderProductCommentsSection(options = {}) {
     ? orderedReviewCards
         .slice(0, 6)
         .map((review) => {
-          const rawReviewName = String(firstNonNull(review.name, review.userName, review.user_name, review.user?.name, review.customer?.name, reviewBelongsToCurrentUser(review, belongsOptions) ? firstNonNull(state.sessionUser?.name, state.sessionUser?.username, state.sessionUser?.email, null) : null, "Pajulina member") || "Pajulina member").trim();
+          const rawReviewName = String(firstNonNull(review.name, review.userName, review.user_name, review.user?.name, review.customer?.name, reviewBelongsToCurrentUser(review, belongsOptions) ? firstNonNull(state.sessionUser?.name, state.sessionUser?.username, state.sessionUser?.email, null) : null, "Skino member") || "Skino member").trim();
           const reviewName = escapeHtml(rawReviewName);
           const reviewInitials = escapeHtml(
             rawReviewName

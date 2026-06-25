@@ -4,13 +4,13 @@ This package deploys as static assets on Cloudflare Workers. No Node server or t
 
 Cloudflare Workers Builds settings:
 
-- Project name: `selldone-shop-a1`
+- Project name: `1-shop-skino`
 - Build command: `npm run build:static`
 - Deploy command: `npx wrangler deploy`
 - Non-production branch deploy command: `npx wrangler versions upload`
 - Path: `/`
-- Production domain: `shop.niomatic.com`
-- OAuth callback URL: `https://shop.niomatic.com/callback/`
+- Production domain: `shop.skino.me`
+- OAuth callback URL: `https://shop.skino.me/callback/`
 
 ## Runtime config
 
@@ -45,8 +45,8 @@ The local server is only a file server. Storefront XAPI requests go directly to 
 
 ## Token storage
 
-- Storefront OAuth tokens: `pajulina_storefront_oauth_tokens_v1`
-- Dashboard OAuth tokens: `pajulina_dashboard_oauth_tokens_v1`
+- Storefront OAuth tokens: `skino_storefront_oauth_tokens_v1`
+- Dashboard OAuth tokens: `skino_dashboard_oauth_tokens_v1`
 
 ## API routing
 

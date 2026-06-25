@@ -1,4 +1,4 @@
-﻿const DEFAULT_PUBLIC_ENV = {
+const DEFAULT_PUBLIC_ENV = {
   APP_NAME: "Selldone Custom Storefront",
   APP_BASE_URL: "",
   SELLDONE_BASE: "https://selldone.com",
@@ -23,9 +23,9 @@ let cachedConfig = null;
 
 export function getPublicConfig() {
   if (cachedConfig) return cachedConfig;
-  const hasInjectedConfig = typeof window !== "undefined" && window.PAJULINA_PUBLIC_ENV && typeof window.PAJULINA_PUBLIC_ENV === "object";
+  const hasInjectedConfig = typeof window !== "undefined" && window.SKINO_PUBLIC_ENV && typeof window.SKINO_PUBLIC_ENV === "object";
   const injected = hasInjectedConfig
-    ? window.PAJULINA_PUBLIC_ENV
+    ? window.SKINO_PUBLIC_ENV
     : {};
   const origin = typeof window !== "undefined" ? window.location.origin : "";
   const metaFallback = readMetaPublicEnv();
@@ -68,20 +68,20 @@ export function getPublicConfig() {
 
 function readMetaPublicEnv() {
   return compactObject({
-    APP_NAME: readMetaContent("pajulina-app-name"),
-    SELLDONE_BASE: readMetaContent("pajulina-selldone-base") || readMetaContent("service-url"),
-    SELLDONE_AUTH_BASE: readMetaContent("pajulina-selldone-base") || readMetaContent("service-url"),
-    SELLDONE_TOKEN_BASE: readMetaContent("pajulina-selldone-base") || readMetaContent("service-url"),
-    API_BASE: readMetaContent("pajulina-api-base"),
-    STOREFRONT_XAPI_BASE: readMetaContent("pajulina-xapi-base") || readMetaContent("selldone-xapi"),
-    AUTH_PROMPT: readMetaContent("pajulina-auth-prompt"),
-    CLIENT_ID: readMetaContent("pajulina-client-id"),
-    SHOP_ID: readMetaContent("pajulina-shop-id"),
-    SHOP_NAME: readMetaContent("pajulina-shop-name"),
-    SHOP_DOMAIN: readMetaContent("pajulina-shop-domain"),
-    STOREFRONT_SHOP_HANDLE: readMetaContent("pajulina-storefront-shop-handle") || readMetaContent("shop-name"),
-    DASHBOARD_PATH: readMetaContent("pajulina-dashboard-path"),
-    CALLBACK_PATH: readMetaContent("pajulina-callback-path"),
+    APP_NAME: readMetaContent("skino-app-name"),
+    SELLDONE_BASE: readMetaContent("skino-selldone-base") || readMetaContent("service-url"),
+    SELLDONE_AUTH_BASE: readMetaContent("skino-selldone-base") || readMetaContent("service-url"),
+    SELLDONE_TOKEN_BASE: readMetaContent("skino-selldone-base") || readMetaContent("service-url"),
+    API_BASE: readMetaContent("skino-api-base"),
+    STOREFRONT_XAPI_BASE: readMetaContent("skino-xapi-base") || readMetaContent("selldone-xapi"),
+    AUTH_PROMPT: readMetaContent("skino-auth-prompt"),
+    CLIENT_ID: readMetaContent("skino-client-id"),
+    SHOP_ID: readMetaContent("skino-shop-id"),
+    SHOP_NAME: readMetaContent("skino-shop-name"),
+    SHOP_DOMAIN: readMetaContent("skino-shop-domain"),
+    STOREFRONT_SHOP_HANDLE: readMetaContent("skino-storefront-shop-handle") || readMetaContent("shop-name"),
+    DASHBOARD_PATH: readMetaContent("skino-dashboard-path"),
+    CALLBACK_PATH: readMetaContent("skino-callback-path"),
   });
 }
 

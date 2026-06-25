@@ -1,7 +1,7 @@
 import { renderProductCommentsSection } from "./product-comments.js?v=storefront-product-rating-refactor-20260621";
 import { renderProductRatingSection } from "./product-rating.js?v=storefront-product-rating-refactor-20260621";
 
-const favoriteStorageKey = "pajulina:favorites";
+const favoriteStorageKey = "skino:favorites";
 
 function productIsFavorite(productId = "") {
   try {
@@ -483,7 +483,7 @@ export async function renderProductPage(deps) {
             ${formatPrice(itemPrice, item.currency)}
             ${itemOriginal ? `<s>${formatPrice(itemOriginal, item.currency)}</s>` : ""}
           </div>
-          <p class="points-note">Earn points on this purchase as a Pajulina Rewards member.</p>
+          <p class="points-note">Earn points on this purchase as a Skino Rewards member.</p>
           ${variantSection}
 
           <section class="delivery-section">

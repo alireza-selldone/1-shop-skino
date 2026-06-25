@@ -1,6 +1,6 @@
 # Selldone Static Storefront and Dashboard
 
-[![GitHub Repository](https://img.shields.io/badge/GitHub-View%20on%20GitHub-181717?logo=github&logoColor=white)](https://github.com/pajuhaan/selldone-custom-storefront-backoffice-1)
+[![GitHub Repository](https://img.shields.io/badge/GitHub-View%20on%20GitHub-181717?logo=github&logoColor=white)](https://github.com/alireza-selldone/1-shop-skino)
 
 A fully static Selldone storefront plus browser-side dashboard for Cloudflare Workers Static Assets.
 
@@ -75,8 +75,8 @@ Cloudflare Workers Builds settings:
 - Deploy command: `npx wrangler deploy`
 - Non-production branch deploy command: `npx wrangler versions upload`
 - Path: `/`
-- Production domain: `shop.niomatic.com`
-- OAuth callback URL: `https://shop.niomatic.com/callback/`
+- Production domain: `shop.skino.me`
+- OAuth callback URL: `https://shop.skino.me/callback/`
 
 `wrangler.toml` deploys `dist/` with Workers Static Assets. `/dashboard/` and `/callback/` are real directory index pages, and unknown client routes fall back to the SPA shell.
 
@@ -92,7 +92,7 @@ Cloudflare Workers Builds settings:
 Use Cloudflare Workers Builds connected to this GitHub repository. The Cloudflare build form should use:
 
 ```text
-Project name: selldone-shop-a1
+Project name: 1-shop-skino
 Build command: npm run build:static
 Deploy command: npx wrangler deploy
 Non-production branch deploy command: npx wrangler versions upload
