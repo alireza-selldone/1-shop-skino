@@ -1,7 +1,10 @@
 name = "1-shop-skino"
+main = "worker/index.js"
 compatibility_date = "2026-06-22"
 
 [assets]
 directory = "./dist/"
+binding = "ASSETS"
+run_worker_first = ["/api/storefront/*"]
 not_found_handling = "single-page-application"
 html_handling = "auto-trailing-slash"
