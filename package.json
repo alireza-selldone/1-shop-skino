@@ -1,8 +1,13 @@
 {
   "scripts": {
     "start": "node server.mjs",
-    "restart": "start-dashboard.cmd"
+    "restart": "start-dashboard.cmd",
+    "deploy": "wrangler deploy",
+    "preview": "wrangler dev"
   },
   "private": true,
-  "type": "module"
+  "type": "module",
+  "devDependencies": {
+    "wrangler": "^4.105.0"
+  }
 }
