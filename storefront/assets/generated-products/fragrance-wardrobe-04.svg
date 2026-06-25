@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="900" height="900" viewBox="0 0 660 700">
+    <title>Iris Cloud Scent</title>
+    <rect width="660" height="700" fill="none"/>
+    
+    <circle cx="196" cy="196" r="8" fill="#d8c6b8" opacity=".55"/>
+    <path d="M482 163c34 28 50 58 38 86-26-22-54-34-84-36 10-22 26-38 46-50z" fill="#9b6a54" opacity=".16"/>
+    <path d="M152 498c36-18 72-18 108 0-32 18-68 22-108 0z" fill="#9b6a54" opacity=".2"/>
+    <ellipse cx="330" cy="612" rx="132" ry="22" fill="rgba(0,0,0,.13)"/>
+    
+    <rect x="274" y="116" width="112" height="446" rx="44" fill="#d8c6b8" stroke="#222" stroke-width="3"/>
+    <rect x="292" y="82" width="76" height="70" rx="14" fill="#9b6a54"/>
+    <rect x="292" y="244" width="76" height="154" rx="6" fill="rgba(255,255,255,.68)"/>
+    <text x="330" y="328" text-anchor="middle" font-family="Arial" font-size="20" font-weight="700" fill="#24201d">LIRI</text>
+  </svg>

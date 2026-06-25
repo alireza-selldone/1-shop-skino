@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="900" height="900" viewBox="0 0 640 640">
+    <title>Beauty Supplements</title>
+    <rect width="640" height="640" fill="none"/>
+    <circle cx="320" cy="320" r="286" fill="#f4f1eb"/>
+    <circle cx="320" cy="320" r="246" fill="#dbe2d3" opacity=".75"/>
+    
+      <ellipse cx="330" cy="268" rx="116" ry="30" fill="#6d8363"/>
+      <rect x="216" y="268" width="228" height="64" rx="18" fill="#6d8363"/>
+      <rect x="230" y="322" width="200" height="190" rx="46" fill="#ffffff" stroke="#222" stroke-width="3"/>
+      <ellipse cx="330" cy="322" rx="100" ry="24" fill="rgba(255,255,255,.45)"/>
+      <rect x="272" y="378" width="116" height="72" rx="8" fill="rgba(255,255,255,.72)"/>
+      <text x="330" y="422" text-anchor="middle" font-family="Arial" font-size="18" font-weight="700" fill="#24201d">BEAUTY</text>
+  </svg>

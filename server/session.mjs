@@ -10,8 +10,8 @@ export const SESSION_CONTEXTS = {
 };
 
 export const SESSION_COOKIE_NAMES = {
-  [SESSION_CONTEXTS.DASHBOARD]: "pajulina_dashboard_sid",
-  [SESSION_CONTEXTS.STOREFRONT]: "pajulina_storefront_sid",
+  [SESSION_CONTEXTS.DASHBOARD]: "skino_dashboard_sid",
+  [SESSION_CONTEXTS.STOREFRONT]: "skino_storefront_sid",
 };
 
 function normalizeSessionContext(context) {

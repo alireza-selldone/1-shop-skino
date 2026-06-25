@@ -2,9 +2,9 @@ import { selldoneImagePathToUrl } from "/dashboard/features/selldone-images.js?v
 
 const SPRITE_COLUMNS = 4;
 const SPRITE_ROWS = 4;
-const CART_KEY = "pajulina_storefront_cart_v1";
-const STOREFRONT_ACCESS_TOKEN_KEY = "pajulina_storefront_access_token";
-const STOREFRONT_TOKEN_EXPIRES_AT_KEY = "pajulina_storefront_access_token_expires_at";
+const CART_KEY = "skino_storefront_cart_v1";
+const STOREFRONT_ACCESS_TOKEN_KEY = "skino_storefront_access_token";
+const STOREFRONT_TOKEN_EXPIRES_AT_KEY = "skino_storefront_access_token_expires_at";
 const DATA_SOURCE = {
   xapi: "xapi",
 };
@@ -14,8 +14,8 @@ const heroSlides = [
   {
     image: "assets/cosmetic-hero-ritual.png",
     position: "50% 50%",
-    accent: "#1f8f3a",
-    eyebrow: "Pajulina cosmetic shop",
+    accent: "#246bfe",
+    eyebrow: "Skino cosmetic shop",
     title: "Glow rituals, edited beautifully",
     body: "Fresh skin care, soft color, and everyday essentials curated for a clean routine.",
     cta: "Shop skin care",
@@ -24,7 +24,7 @@ const heroSlides = [
   {
     image: "assets/cosmetic-hero-discounts.png",
     position: "58% 50%",
-    accent: "#e4b900",
+    accent: "#ff5ca8",
     eyebrow: "Member beauty deals",
     title: "Save on the icons in your routine",
     body: "Discounted beauty finds with premium skin, makeup, and gifting picks in one edit.",
@@ -34,7 +34,7 @@ const heroSlides = [
   {
     image: "assets/cosmetic-hero-routine.png",
     position: "54% 50%",
-    accent: "#2aa36b",
+    accent: "#5b7cfa",
     eyebrow: "Routine order",
     title: "Cream pots first, eye essentials last",
     body: "Start with skin-focused jars, move into tubes, then finish with refined eye products.",
@@ -502,7 +502,7 @@ function generateProductPros(product = {}) {
     },
     {
       title: "Details",
-      body: `${category} performance with a curated Pajulina feel: balanced payoff, clean presentation, and packaging suited for daily use or gifting.`,
+      body: `${category} performance with a curated Skino feel: balanced payoff, clean presentation, and packaging suited for daily use or gifting.`,
     },
     {
       title: "How To Use",
@@ -534,7 +534,7 @@ function generateProductPros(product = {}) {
       title: "Shipping & Coupon Restrictions",
       body: pickProsText(
         [
-          "Ships as a physical Pajulina item. Standard shipping, pickup, and eligible promotions apply unless the cart says otherwise.",
+          "Ships as a physical Skino item. Standard shipping, pickup, and eligible promotions apply unless the cart says otherwise.",
           "Available for physical delivery. Some coupons, bundles, or regional shipping methods may be limited at checkout.",
           "Eligible for standard storefront checkout. Final delivery cost and promotion availability are confirmed by Selldone in the cart.",
           "Packed for safe delivery. Shipping options, COD, and discounts are calculated live before payment.",
@@ -1964,7 +1964,7 @@ function renderHomePage() {
           </div>
         </div>
         <div class="feature-grid">
-          ${featureCard("Pajulina Beauty Collection", "Clean color and easy everyday shine.", "12% 55%")}
+          ${featureCard("Skino Beauty Collection", "Clean color and easy everyday shine.", "12% 55%")}
           ${featureCard("DIBS Beauty", "Cool girl color for lips and cheeks.", "35% 45%")}
           ${featureCard("Live Tinted", "Skin-first makeup for warm radiance.", "58% 48%")}
           ${featureCard("isima", "Hair care made for bounce and shine.", "80% 48%")}
@@ -1977,7 +1977,7 @@ function renderHomePage() {
         <div class="gift-banner">
           <div class="gift-copy">
             <h2>Find a gift Dad will love</h2>
-            <p>Ask Pajulina AI for personalized picks, from skin care to fragrance.</p>
+            <p>Ask Skino AI for personalized picks, from skin care to fragrance.</p>
             <a class="text-link" href="#shop?category=gifts">Start chat</a>
           </div>
           <div class="gift-image" role="img" aria-label="Beauty gifts and cosmetics"></div>
@@ -2003,7 +2003,7 @@ function renderHomePage() {
         <div class="coupon-band">
           <div>
             <strong>20% off your first purchase</strong>
-            <span>When you sign up for Pajulina emails. Exclusions apply.</span>
+            <span>When you sign up for Skino emails. Exclusions apply.</span>
           </div>
           <a class="text-link" href="#shop">See details</a>
         </div>
@@ -2020,13 +2020,13 @@ function renderHomePage() {
 
       <section class="section">
         <div class="section-head">
-          <h2>All things Pajulina Beauty</h2>
+          <h2>All things Skino Beauty</h2>
         </div>
         <div class="magazine-row">
           ${storyCard("Pride, Amplified", "Joyful color made for every day.", "18% 52%", true)}
           ${storyCard("Apply to be a part of the 2026 Muse cohort", "Creators, artists, and beauty voices.", "42% 50%", true)}
-          ${storyCard("Join the Pajulina Beauty Community today", "Tips, events, and new favorites.", "60% 50%", true)}
-          ${storyCard("Give a Pajulina Beauty gift card", "The easiest gift for every routine.", "86% 45%", true)}
+          ${storyCard("Join the Skino Beauty Community today", "Tips, events, and new favorites.", "60% 50%", true)}
+          ${storyCard("Give a Skino Beauty gift card", "The easiest gift for every routine.", "86% 45%", true)}
         </div>
       </section>
     </div>
@@ -2049,10 +2049,10 @@ function renderShopPage() {
       <section class="shop-hero">
         <div class="shop-hero-copy">
           <span class="eyebrow">Discover the refreshed</span>
-          <h1>Pajulina Beauty Collection</h1>
+          <h1>Skino Beauty Collection</h1>
           <p>Cruelty free beauty with clean ingredients, fresh color, and everyday ease.</p>
         </div>
-        <div class="shop-hero-image" role="img" aria-label="Pajulina beauty collection products"></div>
+        <div class="shop-hero-image" role="img" aria-label="Skino beauty collection products"></div>
       </section>
 
       <section class="section-tight">
@@ -2206,7 +2206,7 @@ async function renderProductPage(productId) {
             ${formatPrice(itemPrice, item.currency)}
             ${itemOriginal ? `<s>${formatPrice(itemOriginal, item.currency)}</s>` : ""}
           </div>
-          <p class="points-note">Earn points on this purchase as a Pajulina Rewards member.</p>
+          <p class="points-note">Earn points on this purchase as a Skino Rewards member.</p>
           ${variantSection}
 
           <section class="delivery-section">
@@ -2884,7 +2884,7 @@ async function handleCheckoutSubmit(event) {
     renderCart();
     state.checkoutSubmitting = false;
     state.activeCheckoutShippingKey = "";
-    renderLiveCatalogEmptyState("Order placed", orderId ? `Your order ${orderId} has been received. Thank you for shopping with Pajulina.` : "Your order has been received. Thank you for shopping with Pajulina.");
+    renderLiveCatalogEmptyState("Order placed", orderId ? `Your order ${orderId} has been received. Thank you for shopping with Skino.` : "Your order has been received. Thank you for shopping with Skino.");
     setTimeout(() => setHash("shop"), 1000);
   } catch (error) {
     state.checkoutSubmitting = false;
@@ -2936,8 +2936,8 @@ function getFilteredProducts() {
 function shopHeading() {
   if (state.search) return `Search results for "${state.search}"`;
   if (state.activeDiscountOnly && (!state.activeCategory || state.activeCategory === "all")) return "Discounted Beauty";
-  if (!state.activeCategory || state.activeCategory === "all") return "Pajulina Beauty";
-  return `${state.activeDiscountOnly ? "Discounted " : ""}${titleCase(state.activeCategory)} at Pajulina`;
+  if (!state.activeCategory || state.activeCategory === "all") return "Skino Beauty";
+  return `${state.activeDiscountOnly ? "Discounted " : ""}${titleCase(state.activeCategory)} at Skino`;
 }
 
 function eventTile(title, body, pos) {

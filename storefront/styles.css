@@ -1,17 +1,17 @@
 :root {
   color-scheme: light;
   --ink: #111111;
-  --muted: #6c625e;
-  --soft: #f3f8e9;
-  --soft-2: #fbf8dc;
-  --line: #e3ebcf;
-  --hot: #1f8f3a;
-  --hot-2: #7ecf45;
-  --orange: #e4b900;
-  --blue: #c9e873;
-  --teal: #2aa36b;
-  --green: #1f8f3a;
-  --gold: #c29b00;
+  --muted: #665f70;
+  --soft: #eef5ff;
+  --soft-2: #fff0f7;
+  --line: #dce7ff;
+  --hot: #246bfe;
+  --hot-2: #ff5ca8;
+  --orange: #ff5ca8;
+  --blue: #d9e8ff;
+  --teal: #5b7cfa;
+  --green: #246bfe;
+  --gold: #e13f91;
   --page: 1060px;
   --radius: 8px;
   --font: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
@@ -72,7 +72,7 @@ img {
 }
 
 .utility-bar {
-  border-bottom: 1px solid #edf2d8;
+  border-bottom: 1px solid #e8efff;
   font-size: 11px;
 }
 
@@ -82,7 +82,7 @@ img {
   align-items: center;
   justify-content: space-between;
   gap: 20px;
-  color: #4d4541;
+  color: #4d4860;
 }
 
 .utility-inner nav,
@@ -151,7 +151,7 @@ img {
   display: flex;
   align-items: center;
   gap: 9px;
-  border-bottom: 1px solid #6e6561;
+  border-bottom: 1px solid #6d7ed8;
 }
 
 .search-form svg,
@@ -176,12 +176,56 @@ img {
 }
 
 .search-form input::placeholder {
-  color: #8d817b;
+  color: #8a83a0;
 }
 
 .nav-actions {
-  gap: 6px;
+  gap: 8px;
   justify-content: flex-end;
+}
+
+.header-preferences {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.header-preferences label {
+  min-width: 72px;
+  display: grid;
+  gap: 2px;
+}
+
+.header-preferences span {
+  color: var(--muted);
+  font-size: 8px;
+  font-weight: 780;
+  line-height: 1;
+  text-transform: uppercase;
+}
+
+.header-preferences select {
+  width: 100%;
+  min-height: 28px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 0 24px 0 10px;
+  background:
+    linear-gradient(45deg, transparent 50%, var(--hot) 50%) calc(100% - 13px) 12px / 5px 5px no-repeat,
+    linear-gradient(135deg, var(--hot) 50%, transparent 50%) calc(100% - 8px) 12px / 5px 5px no-repeat,
+    #ffffff;
+  color: var(--ink);
+  font-size: 11px;
+  font-weight: 720;
+  outline: 0;
+  appearance: none;
+  cursor: pointer;
+}
+
+.header-preferences select:hover,
+.header-preferences select:focus-visible {
+  border-color: var(--hot);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--hot) 13%, transparent);
 }
 
 .icon-button {
@@ -546,7 +590,7 @@ img {
   min-height: clamp(340px, 46vw, 560px);
   margin-top: 18px;
   border-radius: 10px;
-  background: #f4f8e7;
+  background: #eef5ff;
   box-shadow: 0 16px 48px rgba(17, 17, 17, 0.08);
   isolation: isolate;
 }
@@ -604,7 +648,7 @@ img {
 .hero-copy p {
   max-width: 390px;
   margin: 16px 0 22px;
-  color: #453c38;
+  color: #454056;
   font-size: clamp(14px, 1.6vw, 17px);
   line-height: 1.5;
 }
@@ -705,15 +749,15 @@ img {
 }
 
 .promo-card.hot:after {
-  background: linear-gradient(135deg, rgba(31, 143, 58, 0.98), rgba(126, 207, 69, 0.76));
+  background: linear-gradient(135deg, rgba(36, 107, 254, 0.98), rgba(255, 92, 168, 0.76));
 }
 
 .promo-card.orange {
-  background: #f3c91d;
+  background: #ffd7e8;
 }
 
 .promo-card.blue {
-  background: #eff8d2;
+  background: #e5efff;
 }
 
 .promo-body {
@@ -994,7 +1038,7 @@ img.large-sprite {
 .black-button:hover,
 .pill-button:hover,
 .cart-summary button:hover {
-  background: #176f2e;
+  background: #1853d8;
 }
 
 .deal-card {
@@ -1069,7 +1113,7 @@ img.large-sprite {
 .feature-card p,
 .story-card p {
   margin: 0 9px 10px;
-  color: #625852;
+  color: #625b72;
   font-size: 11px;
 }
 
@@ -1089,7 +1133,7 @@ img.large-sprite {
   min-height: 160px;
   overflow: hidden;
   border-radius: 6px;
-  background: #eef7d4;
+  background: #edf4ff;
 }
 
 .gift-copy {
@@ -1118,7 +1162,7 @@ img.large-sprite {
   gap: 10px;
   padding: 12px;
   border-radius: 6px;
-  background: #f6f2c8;
+  background: #fff0f7;
 }
 
 .obsession-copy {
@@ -1144,7 +1188,7 @@ img.large-sprite {
   min-height: 58px;
   padding: 12px 18px;
   border-radius: 4px;
-  background: #f5f8d9;
+  background: #eef5ff;
 }
 
 .coupon-band strong {
@@ -1506,7 +1550,7 @@ img.large-sprite {
 
 .delivery-card.is-active {
   border-color: var(--ink);
-  background: #f7fbef;
+  background: #eef5ff;
 }
 
 .delivery-card strong {
@@ -1539,7 +1583,7 @@ img.large-sprite {
   margin-top: 12px;
   padding: 12px;
   border-radius: 4px;
-  background: #fff5ec;
+  background: #fff0f7;
   font-size: 12px;
 }
 
@@ -1759,7 +1803,7 @@ img.large-sprite {
 .signup-card {
   padding: 16px;
   border-top: 8px solid var(--orange);
-  background: #f7fbdf;
+  background: #fff0f7;
 }
 
 .signup-card form {
@@ -1875,10 +1919,10 @@ img.large-sprite {
 .cart-status {
   margin: 8px 0 10px;
   padding: 10px 12px;
-  border: 1px solid #d8ead3;
+  border: 1px solid #d8e5ff;
   border-radius: 10px;
-  background: #f3faef;
-  color: #235226;
+  background: #eef5ff;
+  color: #1746a2;
   font-size: 12px;
 }
 
@@ -2135,7 +2179,7 @@ img.large-sprite {
 .checkout-payment-option.is-active,
 .checkout-payment-option:has(input:checked) {
   border-color: var(--ink);
-  background: #f7fbef;
+  background: #eef5ff;
 }
 
 .checkout-payment-option input {
@@ -2158,10 +2202,10 @@ img.large-sprite {
 .checkout-status {
   margin-top: 10px;
   padding: 10px 12px;
-  border: 1px solid #d8ead3;
+  border: 1px solid #d8e5ff;
   border-radius: 8px;
-  background: #f3faef;
-  color: #235226;
+  background: #eef5ff;
+  color: #1746a2;
   font-size: 12px;
 }
 
@@ -2438,8 +2482,36 @@ img.large-sprite {
     font-size: 18px;
   }
 
-  .nav-actions .icon-button:first-child {
+  .account-control {
     display: none;
+  }
+
+  .nav-actions {
+    gap: 5px;
+  }
+
+  .header-preferences {
+    gap: 4px;
+  }
+
+  .header-preferences label {
+    min-width: 54px;
+  }
+
+  .header-preferences span {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+  }
+
+  .header-preferences select {
+    min-height: 30px;
+    padding-left: 9px;
+    padding-right: 22px;
+    font-size: 10px;
   }
 
   .hero-carousel {

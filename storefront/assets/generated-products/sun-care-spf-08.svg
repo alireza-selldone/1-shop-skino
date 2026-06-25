@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="900" height="900" viewBox="0 0 660 700">
+    <title>Soft Shade Lip SPF</title>
+    <rect width="660" height="700" fill="none"/>
+    
+    <circle cx="196" cy="182" r="11" fill="#f4d59d" opacity=".55"/>
+    <path d="M482 175c34 28 50 58 38 86-26-22-54-34-84-36 10-22 26-38 46-50z" fill="#d49a35" opacity=".16"/>
+    <path d="M152 490c36-18 72-18 108 0-32 18-68 22-108 0z" fill="#d49a35" opacity=".2"/>
+    <ellipse cx="330" cy="612" rx="141" ry="22" fill="rgba(0,0,0,.13)"/>
+    
+      <path d="M270 126h120l-16 438H286z" fill="#f4d59d" stroke="#222" stroke-width="3"/>
+      <path d="M292 146h76l-10 392h-56z" fill="rgba(255,255,255,.42)"/>
+      <rect x="284" y="558" width="92" height="34" rx="9" fill="#d49a35"/>
+      <text x="330" y="334" text-anchor="middle" transform="rotate(-90 330 334)" font-family="Arial" font-size="28" font-weight="700" fill="#191715">HELIO</text>
+  </svg>

@@ -1,6 +1,6 @@
-# Pajulina Storefront
+# Skino Storefront
 
-Standalone English storefront prototype for Pajulina Beauty.
+Standalone English storefront prototype for Skino Beauty.
 
 Open this storefront through the local Node server (not `file://`), especially when live Selldone storefront data is needed.
 

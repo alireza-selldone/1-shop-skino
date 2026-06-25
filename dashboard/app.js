@@ -6,9 +6,9 @@ import { resolveSelldoneRecordImage as resolveSelldoneImageRecord } from "./feat
 
 const LOW_STOCK_LIMIT = 8;
 const LOCAL_APP_URL = "http://localhost:5173/dashboard/";
-const AUTH_REDIRECT_KEY = "pajulina_auth_redirect_started";
-const CONSENT_REDIRECT_KEY = "pajulina_consent_redirect_started";
-const THEME_KEY = "pajulina_dashboard_theme_v2";
+const AUTH_REDIRECT_KEY = "skino_auth_redirect_started";
+const CONSENT_REDIRECT_KEY = "skino_consent_redirect_started";
+const THEME_KEY = "skino_dashboard_theme_v2";
 
 const VIEW_META = {
   overview: {

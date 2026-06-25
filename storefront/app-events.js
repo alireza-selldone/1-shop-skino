@@ -34,7 +34,33 @@ const {
   normalizeGallery,
 } = storefront;
 
+const CURRENCY_PREF_KEY = "skino_storefront_currency";
+const LANGUAGE_PREF_KEY = "skino_storefront_language";
+const SUPPORTED_CURRENCIES = new Set(["USD", "EUR", "AED"]);
+const SUPPORTED_LANGUAGES = new Set(["en", "fa", "fr"]);
+
+function applyHeaderPreferences() {
+  const currencySelect = document.querySelector("[data-currency-select]");
+  const languageSelect = document.querySelector("[data-language-select]");
+  const savedCurrency = localStorage.getItem(CURRENCY_PREF_KEY);
+  const savedLanguage = localStorage.getItem(LANGUAGE_PREF_KEY);
+
+  if (currencySelect && SUPPORTED_CURRENCIES.has(savedCurrency)) {
+    currencySelect.value = savedCurrency;
+  }
+
+  if (languageSelect && SUPPORTED_LANGUAGES.has(savedLanguage)) {
+    languageSelect.value = savedLanguage;
+  }
+
+  const language = languageSelect?.value || "en";
+  document.documentElement.lang = language;
+  document.documentElement.dir = language === "fa" ? "rtl" : "ltr";
+}
+
 export function registerStorefrontInteractions() {
+  applyHeaderPreferences();
+
   document.addEventListener("click", (event) => {
     const accountControl = event.target.closest("[data-account-control]");
     if (!accountControl && state.accountMenuOpen) {
@@ -261,6 +287,21 @@ export function registerStorefrontInteractions() {
   });
 
   document.addEventListener("change", (event) => {
+    const currencySelect = event.target.closest("[data-currency-select]");
+    if (currencySelect) {
+      localStorage.setItem(CURRENCY_PREF_KEY, currencySelect.value);
+      showToast(`Currency set to ${currencySelect.value}`);
+      return;
+    }
+
+    const languageSelect = event.target.closest("[data-language-select]");
+    if (languageSelect) {
+      localStorage.setItem(LANGUAGE_PREF_KEY, languageSelect.value);
+      applyHeaderPreferences();
+      showToast(`Language set to ${languageSelect.value.toUpperCase()}`);
+      return;
+    }
+
     const cartQuantity = event.target.closest("[data-cart-quantity]");
     if (cartQuantity) {
       void setCartQuantity(cartQuantity.dataset.cartQuantity, cartQuantity.value);

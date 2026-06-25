@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="900" height="900" viewBox="0 0 640 640">
+    <title>Fragrance Wardrobe</title>
+    <rect width="640" height="640" fill="none"/>
+    <circle cx="320" cy="320" r="286" fill="#f4f1eb"/>
+    <circle cx="320" cy="320" r="246" fill="#d8c6b8" opacity=".75"/>
+    
+    <rect x="274" y="116" width="112" height="446" rx="44" fill="#ffffff" stroke="#222" stroke-width="3"/>
+    <rect x="292" y="82" width="76" height="70" rx="14" fill="#9b6a54"/>
+    <rect x="292" y="244" width="76" height="154" rx="6" fill="rgba(255,255,255,.68)"/>
+    <text x="330" y="328" text-anchor="middle" font-family="Arial" font-size="20" font-weight="700" fill="#24201d">FRAGRANCE</text>
+  </svg>

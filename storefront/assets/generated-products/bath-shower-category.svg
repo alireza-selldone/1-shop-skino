@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="900" height="900" viewBox="0 0 640 640">
+    <title>Bath &amp; Shower</title>
+    <rect width="640" height="640" fill="none"/>
+    <circle cx="320" cy="320" r="286" fill="#f4f1eb"/>
+    <circle cx="320" cy="320" r="246" fill="#d9d0c3" opacity=".75"/>
+    
+      <rect x="304" y="98" width="54" height="80" rx="13" fill="#7f6d5f"/>
+      <path d="M330 100h104v30h-76" fill="none" stroke="#7f6d5f" stroke-width="22" stroke-linecap="round"/>
+      <rect x="242" y="174" width="176" height="386" rx="38" fill="#ffffff" stroke="#222" stroke-width="3"/>
+      <rect x="278" y="252" width="104" height="164" rx="6" fill="rgba(255,255,255,.74)"/>
+      <text x="330" y="334" text-anchor="middle" font-family="Arial" font-size="20" font-weight="700" fill="#24201d">BATH</text>
+  </svg>

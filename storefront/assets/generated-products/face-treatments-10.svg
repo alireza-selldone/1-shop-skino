@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="900" height="900" viewBox="0 0 660 700">
+    <title>Hydra Cloud Mask</title>
+    <rect width="660" height="700" fill="none"/>
+    
+    <circle cx="152" cy="210" r="8" fill="#eadfd6" opacity=".55"/>
+    <path d="M482 181c34 28 50 58 38 86-26-22-54-34-84-36 10-22 26-38 46-50z" fill="#b58a73" opacity=".16"/>
+    <path d="M152 486c36-18 72-18 108 0-32 18-68 22-108 0z" fill="#b58a73" opacity=".2"/>
+    <ellipse cx="330" cy="612" rx="132" ry="22" fill="rgba(0,0,0,.13)"/>
+    
+      <rect x="304" y="84" width="52" height="88" rx="23" fill="#1f1f1f"/>
+      <rect x="286" y="150" width="88" height="58" rx="10" fill="#b58a73"/>
+      <rect x="270" y="202" width="120" height="360" rx="28" fill="#eadfd6" stroke="#222" stroke-width="3"/>
+      <rect x="296" y="248" width="68" height="188" rx="4" fill="rgba(255,255,255,.72)"/>
+      <text x="330" y="338" text-anchor="middle" font-family="Arial" font-size="20" font-weight="700" fill="#24201d">MIRA</text>
+  </svg>

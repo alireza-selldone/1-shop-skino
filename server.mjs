@@ -5,6 +5,6 @@ import { createRequestHandler } from "./server/routes.mjs";
 const server = createServer(createRequestHandler());
 
 server.listen(PORT, () => {
-  console.log(`Pajulina storefront running at http://localhost:${PORT}/`);
-  console.log(`Pajulina dashboard running at http://localhost:${PORT}/dashboard/`);
+  console.log(`Skino storefront running at http://localhost:${PORT}/`);
+  console.log(`Skino dashboard running at http://localhost:${PORT}/dashboard/`);
 });

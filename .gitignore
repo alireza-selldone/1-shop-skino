@@ -1,5 +1,6 @@
 .chrome-*
 .auth/
+.env
 .idea/
 .tmp_*/
 *.log
@@ -7,5 +8,6 @@
 *.out.log
 *.zip
 dashboard-*.png
+*-check.png
 node-*.log
 server*.log

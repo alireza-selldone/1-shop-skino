@@ -28,7 +28,7 @@ Use the connected Selldone MCP tool for creating/updating a shop-bound dashboard
 {
   "confirm": true,
   "app_type": "public_spa",
-  "name": "Pajulina Local Operations Dashboard",
+  "name": "Skino Local Operations Dashboard",
   "local_callback_urls": [
     "http://localhost:5173/callback",
     "http://127.0.0.1:5173/callback"
@@ -55,7 +55,7 @@ Use the connected Selldone MCP tool for creating/updating a shop-bound dashboard
 
 The current MCP tool name in this Codex environment is:
 
-`mcp__codex_apps__selldone_mcp___pajulina___chatgp`
+`mcp__codex_apps__selldone_mcp___skino___chatgpt`
 
 Direct Selldone API fallback:
 
@@ -65,7 +65,7 @@ Direct Selldone API fallback:
 
 ```json
 {
-  "name": "Pajulina Local Operations Dashboard",
+  "name": "Skino Local Operations Dashboard",
   "redirect": "http://localhost:5173/callback,http://127.0.0.1:5173/callback",
   "public_client": true
 }

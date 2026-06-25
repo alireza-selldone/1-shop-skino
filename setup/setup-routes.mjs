@@ -169,11 +169,11 @@ function mcpOnboardingGuide() {
   return {
     tool: "Create or update a shop-bound dashboard OAuth client",
     endpointToolHint: "selldone_dashboard_oauth_client_upsert",
-    currentMcpToolId: "mcp__codex_apps__selldone_mcp___pajulina___chatgp",
+    currentMcpToolId: "mcp__codex_apps__selldone_mcp___skino___chatgpt",
     parameters: {
       confirm: true,
       app_type: "public_spa",
-      name: "Pajulina Local Operations Dashboard",
+      name: "Skino Local Operations Dashboard",
       local_callback_urls: ["http://localhost:5173/callback", "http://127.0.0.1:5173/callback"],
       allow_development_wildcard_redirects: true,
       requested_scopes: [
@@ -204,7 +204,7 @@ function directApiOnboardingGuide() {
     baseUrl: "https://api.selldone.com",
     auth: "Authorization: Bearer <access_token> with backoffice:shop:write",
     body: {
-      name: "Pajulina Local Operations Dashboard",
+      name: "Skino Local Operations Dashboard",
       redirect: "http://localhost:5173/callback,http://127.0.0.1:5173/callback",
       public_client: true,
     },
@@ -213,7 +213,7 @@ function directApiOnboardingGuide() {
 }
 
 function redirectSetupSessionCookie(res) {
-  res.setHeader("Set-Cookie", cookie("pajulina_dashboard_sid", "", { maxAge: 0, httpOnly: true }));
+  res.setHeader("Set-Cookie", cookie("skino_dashboard_sid", "", { maxAge: 0, httpOnly: true }));
 }
 
 function parseJsonSafe(value) {

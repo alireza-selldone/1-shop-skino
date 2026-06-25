@@ -1,4 +1,4 @@
-const LEGACY_TOKEN_STORAGE_KEY = "pajulina_direct_access_token";
+const LEGACY_TOKEN_STORAGE_KEY = "skino_direct_access_token";
 
 export function createSelldoneDirectClient({ requestSession, onAuthExpired }) {
   let session = null;

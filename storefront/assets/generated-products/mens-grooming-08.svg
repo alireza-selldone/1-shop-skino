@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="900" height="900" viewBox="0 0 660 700">
+    <title>Quiet Cologne Balm</title>
+    <rect width="660" height="700" fill="none"/>
+    
+    <circle cx="196" cy="182" r="11" fill="#d7d7d2" opacity=".55"/>
+    <path d="M482 175c34 28 50 58 38 86-26-22-54-34-84-36 10-22 26-38 46-50z" fill="#40423f" opacity=".16"/>
+    <path d="M152 490c36-18 72-18 108 0-32 18-68 22-108 0z" fill="#40423f" opacity=".2"/>
+    <ellipse cx="330" cy="612" rx="141" ry="22" fill="rgba(0,0,0,.13)"/>
+    
+      <rect x="304" y="98" width="54" height="80" rx="13" fill="#111"/>
+      <path d="M330 100h104v30h-76" fill="none" stroke="#111" stroke-width="22" stroke-linecap="round"/>
+      <rect x="242" y="174" width="176" height="386" rx="38" fill="#d7d7d2" stroke="#222" stroke-width="3"/>
+      <rect x="278" y="252" width="104" height="164" rx="6" fill="rgba(255,255,255,.74)"/>
+      <text x="330" y="334" text-anchor="middle" font-family="Arial" font-size="20" font-weight="700" fill="#24201d">GREYWELL</text>
+  </svg>

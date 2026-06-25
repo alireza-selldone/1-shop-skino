@@ -55,18 +55,18 @@ export function createRequestHandler() {
 
       if (url.pathname === "/auth/logout" || url.pathname === "/auth/dashboard/logout") {
         const cookies = parseCookies(req);
-        destroySession(cookies.pajulina_dashboard_sid);
+        destroySession(cookies.skino_dashboard_sid);
         clearStoredTokens();
         const redirectAfterLogout = sanitizeAuthReturnRoute(req, url.searchParams.get("next")) || "/";
-        redirect(res, redirectAfterLogout, { "Set-Cookie": cookie("pajulina_dashboard_sid", "", { maxAge: 0, httpOnly: true }) });
+        redirect(res, redirectAfterLogout, { "Set-Cookie": cookie("skino_dashboard_sid", "", { maxAge: 0, httpOnly: true }) });
         return;
       }
 
       if (url.pathname === "/auth/storefront/logout") {
         const cookies = parseCookies(req);
-        destroySession(cookies.pajulina_storefront_sid);
+        destroySession(cookies.skino_storefront_sid);
         const redirectAfterLogout = sanitizeAuthReturnRoute(req, url.searchParams.get("next")) || "/";
-        redirect(res, redirectAfterLogout, { "Set-Cookie": cookie("pajulina_storefront_sid", "", { maxAge: 0, httpOnly: true }) });
+        redirect(res, redirectAfterLogout, { "Set-Cookie": cookie("skino_storefront_sid", "", { maxAge: 0, httpOnly: true }) });
         return;
       }
 
