@@ -1,4 +1,4 @@
-import * as storefront from "./app-core.js?v=storefront-product-rating-refactor-20260621";
+import * as storefront from "./app-core.js?v=skino-hero-images-20260626";
 import { updateProductRatingSubmitState } from "./product-rating.js?v=storefront-product-rating-refactor-20260621";
 import { storefrontAuth } from "/shared/auth-client.js";
 

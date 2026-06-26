@@ -1,5 +1,5 @@
 import { selldoneImagePathToUrl } from "/dashboard/features/selldone-images.js?v=storefront-cart-image-20260614b";
-import { renderHomePage as renderHomePageModule } from "./home-page.js?v=storefront-product-article-wide-20260621";
+import { renderHomePage as renderHomePageModule } from "./home-page.js?v=skino-hero-images-20260626";
 import { renderProductPage as renderProductPageModule } from "./product-page.js?v=storefront-product-rating-refactor-20260621";
 import {
   normalizeProductMyRating,
@@ -30,8 +30,8 @@ const BLOG_LIMIT = 24;
 
 const heroSlides = [
   {
-    image: "assets/cosmetic-hero-ritual.png",
-    position: "50% 50%",
+    image: "assets/hero-skino-cream-jar.jpg",
+    position: "70% 50%",
     accent: "#5b341f",
     eyebrow: "Skino cosmetic shop",
     title: "Glow rituals, edited beautifully",
@@ -40,8 +40,8 @@ const heroSlides = [
     href: "#shop?category=skincare",
   },
   {
-    image: "assets/cosmetic-hero-discounts.png",
-    position: "58% 50%",
+    image: "assets/hero-skino-green-jar.jpg",
+    position: "61% 50%",
     accent: "#8b5e3c",
     eyebrow: "Member beauty deals",
     title: "Save on the icons in your routine",
@@ -50,8 +50,8 @@ const heroSlides = [
     href: "#shop?discount=1",
   },
   {
-    image: "assets/cosmetic-hero-routine.png",
-    position: "54% 50%",
+    image: "assets/hero-skino-pink-products.jpg",
+    position: "50% 56%",
     accent: "#111111",
     eyebrow: "Routine order",
     title: "Cream pots first, eye essentials last",
