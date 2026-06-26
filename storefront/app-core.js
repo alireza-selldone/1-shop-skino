@@ -127,7 +127,7 @@ const state = {
   sessionLoaded: false,
   sessionLoading: false,
   sessionAuthenticated: false,
-  sessionLoginUrl: "/auth/storefront/start",
+  sessionLoginUrl: "",
   sessionUser: {},
   productPurchaseStatus: {},
   productPurchaseStatusLoading: {},
@@ -3010,8 +3010,8 @@ async function fetchSessionStatus(force = false) {
         state.accountMenuOpen = false;
         clearStorefrontCartState({ loaded: true });
       }
-      const loginUrl = firstNonNull(payload.loginUrl, "/auth/storefront/start");
-      state.sessionLoginUrl = loginUrl === "/auth/start" ? "/auth/storefront/start" : loginUrl;
+      const loginUrl = firstNonNull(payload.loginUrl, payload.login_url, "");
+      state.sessionLoginUrl = loginUrl === "/auth/start" || loginUrl === "/auth/storefront/start" ? "" : loginUrl;
     }
     state.sessionLoaded = true;
     return state.sessionAuthenticated;
@@ -3188,8 +3188,9 @@ function storefrontUserAvatarUrl(userId, size = "small") {
 }
 
 function buildAccountLoginUrl(nextRoute = "") {
-  const loginUrl = state.sessionLoginUrl || "/auth/storefront/start";
+  const loginUrl = state.sessionLoginUrl || "";
   const loginReturnRoute = storefrontReturnRoute(nextRoute);
+  if (!loginUrl) return "";
   try {
     const target = new URL(loginUrl, window.location.origin);
     target.searchParams.set("next", loginReturnRoute);

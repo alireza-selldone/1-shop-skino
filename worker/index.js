@@ -34,7 +34,8 @@ async function handleStorefrontApi(request, url) {
       return jsonResponse({
         authenticated: false,
         user: null,
-        login_url: "/dashboard/",
+        loginUrl: "",
+        login_url: "",
         source: "cloudflare_worker",
       });
     }
