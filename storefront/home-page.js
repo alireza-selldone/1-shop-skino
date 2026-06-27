@@ -142,8 +142,6 @@ export function renderHomePage(deps) {
       ${renderProductSection("Deals for you", `${deals.length} items`, deals, "product-row")}
       ${renderDealStrip("Today's deals", today)}
 
-      ${renderHomeBlogBand()}
-
       <section class="section">
         <div class="section-head">
           <div>
@@ -205,6 +203,8 @@ export function renderHomePage(deps) {
           ${storyCard("Give a Skino Beauty gift card", "The easiest gift for every routine.", "50% 50%", true, magazineImages.giftCard)}
         </div>
       </section>
+
+      ${renderHomeBlogBand()}
     </div>
   `;
 }
