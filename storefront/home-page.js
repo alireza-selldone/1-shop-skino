@@ -113,7 +113,7 @@ export function renderHomePage(deps) {
           </div>
         </article>
         <article class="promo-card orange promo-card--image promo-card--ritual">
-          <img src="assets/promo-obsession-still.svg" alt="" />
+          <img src="assets/promo-ritual-warm.png" alt="" />
           <div class="promo-body">
             <span class="eyebrow">Only here</span>
             <h2>Worth the obsession</h2>
@@ -122,7 +122,7 @@ export function renderHomePage(deps) {
           </div>
         </article>
         <article class="promo-card blue promo-card--image promo-card--summer">
-          <img src="assets/promo-summer-glow.svg" alt="" />
+          <img src="assets/promo-summer-warm.png" alt="" />
           <div class="promo-body">
             <span class="eyebrow">Summer beauty</span>
             <h2>New arrivals, glowing now</h2>
