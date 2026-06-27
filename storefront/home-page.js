@@ -82,10 +82,10 @@ export function renderHomePage(deps) {
   const newItems = homeNewProducts(products, 4);
   const categoryCards = getCategoryCards();
   const homeCreativeImages = {
-    routine: "assets/home-routine-treat.svg",
-    fragrant: "assets/home-most-fragrant.svg",
-    detector: "assets/home-detector-mode.svg",
-    glow: "assets/home-glow-worthy.svg",
+    routine: "assets/home-favorite-daily-skin-reset.png",
+    fragrant: "assets/home-favorite-signature-scents.png",
+    bestLoved: "assets/home-favorite-best-loved.png",
+    softGlow: "assets/home-favorite-soft-glow.png",
   };
   const magazineImages = {
     pride: "assets/home-magazine-pride.png",
@@ -154,24 +154,24 @@ export function renderHomePage(deps) {
       <section class="section">
         <div class="gift-banner">
           <div class="gift-copy">
-            <h2>Find a gift Dad will love</h2>
-            <p>Ask Skino AI for personalized picks, from skin care to fragrance.</p>
-            <a class="text-link" href="#shop?category=gifts">Start chat</a>
+            <h2>Beauty essentials for every day</h2>
+            <p>Discover skin care, body care, and everyday favorites for a fresh and simple routine.</p>
+            <a class="text-link" href="#shop">Shop now</a>
           </div>
-          <div class="gift-image" role="img" aria-label="Beauty gifts and cosmetics"></div>
+          <div class="gift-image" role="img" aria-label="Skin care and body care essentials"></div>
         </div>
       </section>
 
       <section class="section">
         <div class="obsession-strip">
           <div class="obsession-copy">
-            <h2>Worth the obsession</h2>
-            <a class="text-link" href="#shop">Shop now</a>
+            <h2>Shop by favorite</h2>
+            <a class="text-link" href="#shop">Explore all</a>
           </div>
-          ${storyCard("A routine that feels like a treat", "Skin care favorites for fresh starts.", "50% 50%", false, homeCreativeImages.routine)}
-          ${storyCard("Most fragrant", "Easy scents for day and night.", "50% 50%", false, homeCreativeImages.fragrant)}
-          ${storyCard("Detector mode", "Find color, texture, and glow in one place.", "50% 50%", false, homeCreativeImages.detector)}
-          ${storyCard("Glow-worthy acts", "Care picks that keep skin feeling soft.", "50% 50%", false, homeCreativeImages.glow)}
+          ${storyCard("Daily skin reset", "Gentle essentials for a clean and easy routine.", "50% 50%", false, homeCreativeImages.routine)}
+          ${storyCard("Signature scents", "Fragrance picks for everyday wear and special moments.", "50% 50%", false, homeCreativeImages.fragrant)}
+          ${storyCard("Best-loved picks", "Customer favorites worth a spot on your shelf.", "50% 50%", false, homeCreativeImages.bestLoved)}
+          ${storyCard("Soft glow care", "Comforting care picks for smooth and nourished skin.", "50% 50%", false, homeCreativeImages.softGlow)}
         </div>
       </section>
 

@@ -1679,7 +1679,7 @@ img.large-sprite {
   border-radius: 6px;
   background:
     radial-gradient(circle at 10% 15%, rgba(255, 255, 255, 0.72), transparent 24%),
-    linear-gradient(135deg, #f1ffcf 0%, #dffff1 52%, #ffe9cc 100%);
+    linear-gradient(135deg, #fbf6ef 0%, #f1e3d5 52%, #d8b99f 100%);
 }
 
 .gift-copy {
@@ -1697,9 +1697,10 @@ img.large-sprite {
 }
 
 .gift-image {
-  background-image: url("assets/home-gift-finder.svg");
+  min-height: 160px;
+  background-image: url("assets/home-beauty-essentials-banner.png");
   background-size: cover;
-  background-position: center;
+  background-position: 72% center;
 }
 
 .obsession-strip {
@@ -1710,7 +1711,7 @@ img.large-sprite {
   border-radius: 6px;
   background:
     radial-gradient(circle at 8% 8%, rgba(255, 255, 255, 0.72), transparent 26%),
-    linear-gradient(135deg, #fff8be 0%, #fff0ce 42%, #e1ffd9 100%);
+    linear-gradient(135deg, #fffaf3 0%, #f3e4d6 42%, #d9b99e 100%);
 }
 
 .obsession-copy {
