@@ -1,5 +1,5 @@
 import { selldoneImagePathToUrl } from "/dashboard/features/selldone-images.js?v=storefront-cart-image-20260614b";
-import { renderHomePage as renderHomePageModule } from "./home-page.js?v=skino-hero-images-20260626";
+import { renderHomePage as renderHomePageModule } from "./home-page.js?v=skino-hero-backgrounds-20260627";
 import { renderProductPage as renderProductPageModule } from "./product-page.js?v=storefront-product-rating-refactor-20260621";
 import {
   normalizeProductMyRating,

@@ -11,7 +11,7 @@ function renderHeroCarousel({ state, heroSlides, escapeHtml }) {
             (slide, index) => `
               <article
                 class="hero-slide ${index === activeIndex ? "is-active" : ""}"
-                style="--hero-image:url('${slide.image}');--hero-pos:${slide.position};--hero-accent:${slide.accent};"
+                style="background-image:linear-gradient(90deg,rgba(255,255,255,.9) 0%,rgba(255,255,255,.68) 34%,rgba(255,255,255,.08) 67%),url('${slide.image}');background-position:center,${slide.position};background-size:cover,cover;--hero-accent:${slide.accent};"
                 aria-hidden="${index === activeIndex ? "false" : "true"}"
               >
                 <div class="hero-copy">
