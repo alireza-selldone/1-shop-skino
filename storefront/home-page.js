@@ -54,6 +54,21 @@ function withoutSelectedProducts(products, selectedProducts) {
   return products.filter((item) => !selectedIds.has(String(item?.id ?? item?.key ?? "")));
 }
 
+function renderInstagramReelCard({ title, caption, image, href, position, label }, escapeHtml) {
+  return `
+    <article class="instagram-reel-card">
+      <a class="instagram-reel-media" href="${escapeHtml(href)}" style="background-image:url('${escapeHtml(image)}');background-position:${position};" aria-label="${escapeHtml(title)}">
+        <span class="instagram-reel-label">${escapeHtml(label)}</span>
+        <span class="instagram-reel-play" aria-hidden="true">&#9654;</span>
+        <span class="instagram-reel-copy">
+          <strong>${escapeHtml(title)}</strong>
+          <small>${escapeHtml(caption)}</small>
+        </span>
+      </a>
+    </article>
+  `;
+}
+
 export function renderHomePage(deps) {
   const {
     state,
@@ -192,15 +207,20 @@ export function renderHomePage(deps) {
         </div>
       </section>
 
-      <section class="section">
-        <div class="section-head">
-          <h2>All things Skino Beauty</h2>
+      <section class="section instagram-reels-section">
+        <div class="instagram-reels-head">
+          <div>
+            <span class="eyebrow">Instagram reels</span>
+            <h2>Beauty in motion</h2>
+            <p>Quick routines, fresh looks, and everyday beauty from Skino.</p>
+          </div>
+          <a class="text-link" href="#shop">Shop the looks</a>
         </div>
-        <div class="magazine-row">
-          ${storyCard("Pride, Amplified", "Joyful color made for every day.", "50% 50%", true, magazineImages.pride)}
-          ${storyCard("Apply to be a part of the 2026 Muse cohort", "Creators, artists, and beauty voices.", "50% 50%", true, magazineImages.muse)}
-          ${storyCard("Join the Skino Beauty Community today", "Tips, events, and new favorites.", "50% 50%", true, magazineImages.community)}
-          ${storyCard("Give a Skino Beauty gift card", "The easiest gift for every routine.", "50% 50%", true, magazineImages.giftCard)}
+        <div class="instagram-reels-grid">
+          ${renderInstagramReelCard({ title: "Peach glow in one swipe", caption: "A soft color routine for brighter days.", image: magazineImages.pride, href: "#shop?category=makeup", position: "50% 42%", label: "Reel 01" }, escapeHtml)}
+          ${renderInstagramReelCard({ title: "The soft-focus liner edit", caption: "Simple definition with a polished finish.", image: magazineImages.muse, href: "#shop?category=makeup", position: "52% 36%", label: "Reel 02" }, escapeHtml)}
+          ${renderInstagramReelCard({ title: "Get ready with Skino", caption: "Community routines and fresh favorites.", image: magazineImages.community, href: "#shop", position: "50% 38%", label: "Reel 03" }, escapeHtml)}
+          ${renderInstagramReelCard({ title: "Unbox the evening look", caption: "Care, color, and finishing touches.", image: magazineImages.giftCard, href: "#shop", position: "50% 36%", label: "Reel 04" }, escapeHtml)}
         </div>
       </section>
 
