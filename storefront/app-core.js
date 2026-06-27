@@ -1,5 +1,5 @@
 import { selldoneImagePathToUrl } from "/dashboard/features/selldone-images.js?v=storefront-cart-image-20260614b";
-import { renderHomePage as renderHomePageModule } from "./home-page.js?v=skino-promo-harmony-20260627";
+import { renderHomePage as renderHomePageModule } from "./home-page.js?v=skino-distinct-product-sections-20260627";
 import { renderProductPage as renderProductPageModule } from "./product-page.js?v=storefront-product-rating-refactor-20260621";
 import {
   normalizeProductMyRating,
@@ -5529,6 +5529,42 @@ function renderProductSection(title, subtitle, items, className) {
   `;
 }
 
+function renderRoutineEditSection(title, subtitle, items) {
+  return `
+    <section class="section section--routine-edit">
+      <div class="section-head">
+        <div>
+          <span class="eyebrow">Daily edit</span>
+          <h2>${escapeHtml(title)}</h2>
+          <p>${escapeHtml(subtitle)}</p>
+        </div>
+        <a class="text-link" href="#shop?category=skincare">Explore skin care</a>
+      </div>
+      <div class="routine-edit-grid">
+        ${items.map((item) => productCard(item)).join("")}
+      </div>
+    </section>
+  `;
+}
+
+function renderFreshShelfSection(title, subtitle, items) {
+  return `
+    <section class="section section--fresh-shelf">
+      <div class="fresh-shelf-head">
+        <div>
+          <span class="eyebrow">Recently added</span>
+          <h2>${escapeHtml(title)}</h2>
+          <p>${escapeHtml(subtitle)}</p>
+        </div>
+        <a class="text-link" href="#shop">See what's new</a>
+      </div>
+      <div class="fresh-shelf-grid">
+        ${items.map((item) => productCard(item)).join("")}
+      </div>
+    </section>
+  `;
+}
+
 function renderDealStrip(title, items) {
   return `
     <section class="section">
@@ -5561,6 +5597,8 @@ function renderHomePage() {
     homeNewProducts,
     renderDataStatus,
     renderProductSection,
+    renderRoutineEditSection,
+    renderFreshShelfSection,
     renderDealStrip,
     eventTile,
     featureCard,

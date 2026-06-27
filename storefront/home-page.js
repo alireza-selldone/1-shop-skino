@@ -49,6 +49,11 @@ function renderHeroCarousel({ state, heroSlides, escapeHtml }) {
   `;
 }
 
+function withoutSelectedProducts(products, selectedProducts) {
+  const selectedIds = new Set(selectedProducts.map((item) => String(item?.id ?? item?.key ?? "")));
+  return products.filter((item) => !selectedIds.has(String(item?.id ?? item?.key ?? "")));
+}
+
 export function renderHomePage(deps) {
   const {
     state,
@@ -62,6 +67,8 @@ export function renderHomePage(deps) {
     homeNewProducts,
     renderDataStatus,
     renderProductSection,
+    renderRoutineEditSection,
+    renderFreshShelfSection,
     renderDealStrip,
     featureCard,
     renderHomeBlogBand,
@@ -78,8 +85,8 @@ export function renderHomePage(deps) {
 
   const deals = homeDeals(products, 4);
   const today = homeDeals(products, 6, 4);
-  const recommended = homeRecommended(products, 4);
-  const newItems = homeNewProducts(products, 4);
+  const recommended = homeRecommended(withoutSelectedProducts(products, deals), 4);
+  const newItems = homeNewProducts(withoutSelectedProducts(products, [...deals, ...recommended]), 4);
   const categoryCards = getCategoryCards();
   const homeCreativeImages = {
     routine: "assets/home-favorite-daily-skin-reset.png",
@@ -149,7 +156,7 @@ export function renderHomePage(deps) {
         </div>
       </section>
 
-      ${renderProductSection("We think you'll like", `${recommended.length} items`, recommended, "product-row")}
+      ${renderRoutineEditSection("Ritual-ready essentials", "A focused edit for a simple morning-to-night routine.", recommended)}
 
       <section class="section">
         <div class="gift-banner">
@@ -175,7 +182,7 @@ export function renderHomePage(deps) {
         </div>
       </section>
 
-      ${renderProductSection("New for you", `${newItems.length} items`, newItems, "product-row")}
+      ${renderFreshShelfSection("Fresh from the shelf", "Recently added beauty and personal care, selected for right now.", newItems)}
 
       <section class="section-tight">
         <div class="coupon-band">
