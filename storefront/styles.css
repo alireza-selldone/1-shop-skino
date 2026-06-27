@@ -1761,6 +1761,7 @@ img.large-sprite {
   gap: 8px;
   justify-items: center;
   min-width: 0;
+  background: transparent;
 }
 
 .category-media {
@@ -1769,13 +1770,15 @@ img.large-sprite {
   display: grid;
   place-items: center;
   overflow: hidden;
-  border-radius: 999px;
-  background: #f1f7d8;
+  border-radius: 50%;
+  clip-path: circle(50%);
+  background: #f3ece6;
 }
 
 .category-sprite {
   width: 100%;
   height: 100%;
+  border-radius: inherit;
 }
 
 .category-card span {
@@ -7452,7 +7455,6 @@ body {
 .quick-buy-mini-cart-variant-details div,
 .product-article-content th,
 .cart-item-media,
-.category-card,
 .signup-card {
   background: var(--soft);
 }
