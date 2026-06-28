@@ -2101,7 +2101,9 @@ function renderHomeBlogBand() {
           <p>${items.length ? "Fresh routines, product stories, and store updates from the Selldone blog." : escapeHtml(loadMessage)}</p>
           <a class="pill-button light" href="#blog">${items.length ? "View all posts" : "Open blog"}</a>
         </div>
-        ${items.map((article) => renderHomeBlogTile(article)).join("")}
+        <div class="home-blog-list">
+          ${items.map((article) => renderHomeBlogTile(article)).join("")}
+        </div>
       </div>
     </section>
   `;
