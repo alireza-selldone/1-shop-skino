@@ -7920,5 +7920,21 @@ body {
 }
 
 .signup-card {
-  color: #111111;
+  border-top-color: #5b341f;
+  background: linear-gradient(145deg, #e7cdb8 0%, #cfaa8b 100%);
+  color: #1d120d;
+}
+
+.site-footer .signup-card h3 {
+  color: #1d120d;
+}
+
+.signup-card input {
+  border-color: rgba(29, 18, 13, 0.28);
+  background: #fffaf6;
+  color: #1d120d;
+}
+
+.signup-card input::placeholder {
+  color: #75645c;
 }
