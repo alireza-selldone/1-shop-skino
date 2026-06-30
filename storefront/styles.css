@@ -94,6 +94,15 @@ body.category-menu-open {
   }
 }
 
+@keyframes storefront-preload-shimmer {
+  0% {
+    background-position: 120% 0;
+  }
+  100% {
+    background-position: -120% 0;
+  }
+}
+
 button,
 input,
 select {
@@ -700,6 +709,96 @@ img {
 
 #app {
   min-height: 60vh;
+}
+
+.storefront-preload {
+  padding-bottom: 28px;
+}
+
+.storefront-preload-status {
+  margin: 18px 0 -6px;
+}
+
+.storefront-preload-hero {
+  min-height: clamp(330px, 42vw, 520px);
+  background:
+    linear-gradient(90deg, rgba(255, 255, 255, 0.93) 0%, rgba(255, 255, 255, 0.76) 38%, rgba(255, 255, 255, 0.08) 72%),
+    url("assets/hero-skino-cream-jar.jpg") center 70% / cover no-repeat,
+    #f7f2ed;
+}
+
+.storefront-preload-hero .hero-slide {
+  background-image: none;
+}
+
+.storefront-preload-hero .pill-button {
+  pointer-events: none;
+}
+
+.storefront-preload-promos .promo-card {
+  min-height: 182px;
+}
+
+.storefront-preload .promo-card,
+.storefront-preload-card {
+  position: relative;
+  overflow: hidden;
+}
+
+.storefront-preload .promo-card::before,
+.storefront-preload-card::before,
+.storefront-preload-card::after {
+  content: "";
+  position: absolute;
+  pointer-events: none;
+}
+
+.storefront-preload .promo-card::before,
+.storefront-preload-card::after {
+  inset: 0;
+  background: linear-gradient(100deg, transparent 0%, rgba(255, 255, 255, 0.56) 45%, transparent 78%);
+  background-size: 220% 100%;
+  animation: storefront-preload-shimmer 1.8s ease-in-out infinite;
+}
+
+.storefront-preload-card {
+  min-height: 342px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: #ffffff;
+  box-shadow: none;
+}
+
+.storefront-preload-card::before {
+  inset: 14px 14px auto;
+  height: 58%;
+  border-radius: 8px;
+  background:
+    radial-gradient(circle at 50% 46%, rgba(139, 94, 60, 0.14) 0 22%, transparent 23%),
+    linear-gradient(135deg, #f7f2ed, #e9ded4);
+}
+
+.storefront-preload-card::after {
+  top: 0;
+}
+
+.storefront-preload-card {
+  background-image:
+    linear-gradient(#f2ebe4 0 0),
+    linear-gradient(#eee5dc 0 0),
+    linear-gradient(#f3ede7 0 0),
+    linear-gradient(#eee5dc 0 0);
+  background-repeat: no-repeat;
+  background-size:
+    44px 10px,
+    72% 14px,
+    48% 14px,
+    58% 32px;
+  background-position:
+    18px 232px,
+    18px 257px,
+    18px 282px,
+    18px 306px;
 }
 
 .section {

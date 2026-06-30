@@ -5933,6 +5933,7 @@ async function renderOrderSuccessPage(params = new URLSearchParams()) {
 async function route() {
   const current = parseHash();
   if (current.route !== "order-success") clearOrderSuccessTimer();
+  els.app?.setAttribute("aria-busy", "true");
   setPageLoading(true);
   try {
     if (current.route === "product") {
@@ -5965,6 +5966,7 @@ async function route() {
     renderLiveCatalogEmptyState("Storefront unavailable", error?.message || "Could not open this page.");
   } finally {
     setPageLoading(false);
+    els.app?.setAttribute("aria-busy", "false");
     updateAccountButton();
     renderCart();
   }
