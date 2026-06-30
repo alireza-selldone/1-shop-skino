@@ -5545,15 +5545,15 @@ async function ensureProductsForPage() {
 
 function renderDataStatus() {
   if (state.isLoading) {
-    return `<p class="mini-note" role="status">Fetching latest products from Selldone...</p>`;
+    return "";
   }
   if (state.loadError) {
     return `<p class="mini-note" role="status">${escapeHtml(state.loadError)}</p>`;
   }
   if (state.dataSource === DATA_SOURCE.xapi) {
-    return `<p class="mini-note" role="status">Showing ${productTotal()} live products from Selldone XAPI.</p>`;
+    return "";
   }
-  return `<p class="mini-note" role="status">Waiting for Selldone XAPI catalog.</p>`;
+  return "";
 }
 
 function productTimeValue(item) {

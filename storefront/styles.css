@@ -715,10 +715,6 @@ img {
   padding-bottom: 28px;
 }
 
-.storefront-preload-status {
-  margin: 18px 0 -6px;
-}
-
 .storefront-preload-hero {
   min-height: clamp(330px, 42vw, 520px);
   background:
