@@ -27,6 +27,56 @@ const XAPI_PRODUCT_DETAIL_LIMIT = 500;
 const XAPI_PRODUCT_DETAIL_RETRY = 3;
 const XAPI_PRODUCT_DETAIL_RETRY_DELAY_MS = 450;
 const BLOG_LIMIT = 24;
+const PRODUCT_GALLERY_OVERRIDES = {
+  702734: [
+    "/product-gallery/702734-calm-leaf-botanical-face-oil-gallery-01-lifestyle.webp",
+    "/product-gallery/702734-calm-leaf-botanical-face-oil-gallery-02-flatlay.webp",
+    "/product-gallery/702734-calm-leaf-botanical-face-oil-gallery-03-closeup.webp",
+    "/product-gallery/702734-calm-leaf-botanical-face-oil-gallery-04-set.webp",
+  ],
+  702735: [
+    "/product-gallery/702735-green-clay-reset-cleanser-gallery-01-lifestyle.webp",
+    "/product-gallery/702735-green-clay-reset-cleanser-gallery-02-flatlay.webp",
+    "/product-gallery/702735-green-clay-reset-cleanser-gallery-03-closeup.webp",
+    "/product-gallery/702735-green-clay-reset-cleanser-gallery-04-set.webp",
+  ],
+  702737: [
+    "/product-gallery/702737-silken-roots-scalp-serum-gallery-01-lifestyle.webp",
+    "/product-gallery/702737-silken-roots-scalp-serum-gallery-02-flatlay.webp",
+    "/product-gallery/702737-silken-roots-scalp-serum-gallery-03-closeup.webp",
+    "/product-gallery/702737-silken-roots-scalp-serum-gallery-04-set.webp",
+  ],
+  702739: [
+    "/product-gallery/702739-bare-strand-repair-mask-gallery-01-lifestyle.webp",
+    "/product-gallery/702739-bare-strand-repair-mask-gallery-02-flatlay.webp",
+    "/product-gallery/702739-bare-strand-repair-mask-gallery-03-closeup.webp",
+    "/product-gallery/702739-bare-strand-repair-mask-gallery-04-set.webp",
+  ],
+  702740: [
+    "/product-gallery/702740-cocoa-cloud-body-butter-gallery-01-lifestyle.webp",
+    "/product-gallery/702740-cocoa-cloud-body-butter-gallery-02-flatlay.webp",
+    "/product-gallery/702740-cocoa-cloud-body-butter-gallery-03-closeup.webp",
+    "/product-gallery/702740-cocoa-cloud-body-butter-gallery-04-set.webp",
+  ],
+  702741: [
+    "/product-gallery/702741-amber-bath-body-oil-gallery-01-lifestyle.webp",
+    "/product-gallery/702741-amber-bath-body-oil-gallery-02-flatlay.webp",
+    "/product-gallery/702741-amber-bath-body-oil-gallery-03-closeup.webp",
+    "/product-gallery/702741-amber-bath-body-oil-gallery-04-set.webp",
+  ],
+  702742: [
+    "/product-gallery/702742-pearl-edge-manicure-kit-gallery-01-lifestyle.webp",
+    "/product-gallery/702742-pearl-edge-manicure-kit-gallery-02-flatlay.webp",
+    "/product-gallery/702742-pearl-edge-manicure-kit-gallery-03-closeup.webp",
+    "/product-gallery/702742-pearl-edge-manicure-kit-gallery-04-set.webp",
+  ],
+  702743: [
+    "/product-gallery/702743-soft-halo-facial-brush-gallery-01-lifestyle.webp",
+    "/product-gallery/702743-soft-halo-facial-brush-gallery-02-flatlay.webp",
+    "/product-gallery/702743-soft-halo-facial-brush-gallery-03-closeup.webp",
+    "/product-gallery/702743-soft-halo-facial-brush-gallery-04-set.webp",
+  ],
+};
 
 const heroSlides = [
   {
@@ -519,6 +569,8 @@ function extractImages(rawProduct) {
   if (Array.isArray(rawProduct?.images_arr)) {
     rawProduct.images_arr.forEach(pushImage);
   }
+  const productId = String(firstNonNull(rawProduct?.id, rawProduct?.product_id, rawProduct?.sku, rawProduct?.code, "") || "");
+  (PRODUCT_GALLERY_OVERRIDES[productId] || []).forEach(pushImage);
 
   return Array.from(new Set(collected));
 }
