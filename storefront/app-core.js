@@ -27,6 +27,10 @@ const XAPI_PRODUCT_DETAIL_LIMIT = 500;
 const XAPI_PRODUCT_DETAIL_RETRY = 3;
 const XAPI_PRODUCT_DETAIL_RETRY_DELAY_MS = 450;
 const BLOG_LIMIT = 24;
+const PRODUCT_MAIN_IMAGE_OVERRIDES = {
+  702736: "/product-images/702736-wild-rose-barrier-balm-transparent.webp",
+  702738: "/product-images/702738-lumahair-gloss-milk-transparent.webp",
+};
 const PRODUCT_GALLERY_OVERRIDES = {
   702734: [
     "/product-gallery/702734-calm-leaf-botanical-face-oil-gallery-01-lifestyle.webp",
@@ -40,11 +44,23 @@ const PRODUCT_GALLERY_OVERRIDES = {
     "/product-gallery/702735-green-clay-reset-cleanser-gallery-03-closeup.webp",
     "/product-gallery/702735-green-clay-reset-cleanser-gallery-04-set.webp",
   ],
+  702736: [
+    "/product-gallery/702736-wild-rose-barrier-balm-gallery-01-lifestyle.webp",
+    "/product-gallery/702736-wild-rose-barrier-balm-gallery-02-flatlay.webp",
+    "/product-gallery/702736-wild-rose-barrier-balm-gallery-03-closeup.webp",
+    "/product-gallery/702736-wild-rose-barrier-balm-gallery-04-set.webp",
+  ],
   702737: [
     "/product-gallery/702737-silken-roots-scalp-serum-gallery-01-lifestyle.webp",
     "/product-gallery/702737-silken-roots-scalp-serum-gallery-02-flatlay.webp",
     "/product-gallery/702737-silken-roots-scalp-serum-gallery-03-closeup.webp",
     "/product-gallery/702737-silken-roots-scalp-serum-gallery-04-set.webp",
+  ],
+  702738: [
+    "/product-gallery/702738-lumahair-gloss-milk-gallery-01-lifestyle.webp",
+    "/product-gallery/702738-lumahair-gloss-milk-gallery-02-flatlay.webp",
+    "/product-gallery/702738-lumahair-gloss-milk-gallery-03-closeup.webp",
+    "/product-gallery/702738-lumahair-gloss-milk-gallery-04-set.webp",
   ],
   702739: [
     "/product-gallery/702739-bare-strand-repair-mask-gallery-01-lifestyle.webp",
@@ -532,6 +548,7 @@ function normalizeImageCandidate(candidate, options = {}) {
 
 function extractImages(rawProduct) {
   const collected = [];
+  const productId = String(firstNonNull(rawProduct?.id, rawProduct?.product_id, rawProduct?.sku, rawProduct?.code, "") || "");
   const pushImage = (entry) => {
     const normalized = normalizeImageCandidate(entry, { shopId: rawProduct?.shop_id || rawProduct?.shop?.id });
     if (normalized === null || normalized === undefined) return;
@@ -541,6 +558,8 @@ function extractImages(rawProduct) {
     }
     collected.push(normalized);
   };
+
+  pushImage(PRODUCT_MAIN_IMAGE_OVERRIDES[productId]);
 
   [
     rawProduct?.icon,
@@ -569,7 +588,6 @@ function extractImages(rawProduct) {
   if (Array.isArray(rawProduct?.images_arr)) {
     rawProduct.images_arr.forEach(pushImage);
   }
-  const productId = String(firstNonNull(rawProduct?.id, rawProduct?.product_id, rawProduct?.sku, rawProduct?.code, "") || "");
   (PRODUCT_GALLERY_OVERRIDES[productId] || []).forEach(pushImage);
 
   return Array.from(new Set(collected));
