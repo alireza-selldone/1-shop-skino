@@ -1,5 +1,5 @@
 import { installStaticStorefrontApi } from "./static-storefront-api.js?v=live-oauth-session-20260629";
-import { registerStorefrontInteractions } from "./app-events.js?v=skino-preload-shell-20260701";
+import { registerStorefrontInteractions } from "./app-events.js?v=skino-preload-clean-20260701";
 
 installStaticStorefrontApi();
 registerStorefrontInteractions();

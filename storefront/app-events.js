@@ -1,4 +1,4 @@
-import * as storefront from "./app-core.js?v=skino-preload-shell-20260701";
+import * as storefront from "./app-core.js?v=skino-preload-clean-20260701";
 import { updateProductRatingSubmitState } from "./product-rating.js?v=storefront-product-rating-refactor-20260621";
 import { storefrontAuth } from "/shared/auth-client.js";
 
